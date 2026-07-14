@@ -1,8 +1,7 @@
 # File Watcher Service - Monorepo Architecture with D365 Integration
 
 **Date:** 2026-07-14
-**Status:** Approved
-**Project:** Siam AISIN D365 Integration Monitoring & Control
+
 
 ## Context
 
