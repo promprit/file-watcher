@@ -59,8 +59,14 @@ export interface WatcherState {
   lastSeenAt: Date;
 
   /**
+   * The name of the file (without path).
+   * Extracted from filePath for convenience and querying.
+   */
+  fileName: string;
+
+  /**
    * The size of the file in bytes at the last observation.
    * Used to determine stability (file size stopped changing).
    */
-  lastKnownSize: number;
+  fileSizeBytes: number;
 }
