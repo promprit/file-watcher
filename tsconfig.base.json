@@ -10,6 +10,11 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@packages/*": ["packages/*"],
+      "@apps/*": ["apps/*"]
+    }
   }
 }
