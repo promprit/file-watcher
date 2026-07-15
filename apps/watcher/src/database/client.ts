@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, QueryResult } from 'pg';
 
 export class DatabaseClient {
   private static instance: DatabaseClient;
@@ -21,7 +21,7 @@ export class DatabaseClient {
   }
 
   async query<T = any>(sql: string, params?: any[]): Promise<T[]> {
-    const result = await this.pool.query(sql, params);
+    const result: QueryResult<T> = await this.pool.query(sql, params);
     return result.rows as T[];
   }
 
