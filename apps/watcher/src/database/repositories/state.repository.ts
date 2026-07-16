@@ -4,6 +4,13 @@ import type { StateRepository, WatcherState } from '@packages/contracts';
 export class PostgresStateRepository implements StateRepository {
   private db = DatabaseClient.getInstance();
 
+  private mapRowToState(row: any): WatcherState {
+    return {
+      ...row,
+      fileSizeBytes: typeof row.fileSizeBytes === 'string' ? parseInt(row.fileSizeBytes, 10) : row.fileSizeBytes,
+    };
+  }
+
   async get(interfaceId: string, filePath: string): Promise<WatcherState | null> {
     const sql = `
       SELECT
@@ -20,7 +27,8 @@ export class PostgresStateRepository implements StateRepository {
       FROM watcher_schema.watcher_state
       WHERE interface_id = $1 AND file_path = $2
     `;
-    return this.db.queryOne<WatcherState>(sql, [interfaceId, filePath]);
+    const row = await this.db.queryOne<WatcherState>(sql, [interfaceId, filePath]);
+    return row ? this.mapRowToState(row) : null;
   }
 
   async save(state: WatcherState): Promise<void> {
@@ -73,6 +81,7 @@ export class PostgresStateRepository implements StateRepository {
       WHERE interface_id = $1
       ORDER BY status_changed_at DESC
     `;
-    return this.db.query<WatcherState>(sql, [interfaceId]);
+    const rows = await this.db.query<WatcherState>(sql, [interfaceId]);
+    return rows.map((row) => this.mapRowToState(row));
   }
 }

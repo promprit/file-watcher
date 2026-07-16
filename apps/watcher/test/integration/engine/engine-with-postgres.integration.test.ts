@@ -94,10 +94,102 @@ describe('Engine + PostgresStateRepository Integration', () => {
     expect(savedState?.currentStatus).toBe('FILE_DETECTED');
     expect(savedState?.previousStatus).toBeNull();
     expect(savedState?.fileName).toBe('vendor-invoice-001.xlsx');
-    // PostgreSQL BIGINT is returned as string by pg driver
-    expect(savedState?.fileSizeBytes).toBe('1024');
+    expect(savedState?.fileSizeBytes).toBe(1024);
     expect(savedState?.firstDetectedAt).toEqual(now);
     expect(savedState?.statusChangedAt).toEqual(now);
     expect(savedState?.lastSeenAt).toEqual(now);
+  });
+
+  it('should load previous state on subsequent observation', async () => {
+    const firstObservation: FileObservation = {
+      interfaceId: 'SA-034',
+      path: '/inbound/vendor-invoice-002.xlsx',
+      size: 2048,
+      modified: new Date('2026-07-16T11:00:00Z'),
+      observedAt: new Date('2026-07-16T11:00:00Z'),
+    };
+
+    const now1 = new Date('2026-07-16T11:00:00Z');
+    const event1 = await processObservation(firstObservation, testConfig, stateRepo, now1);
+    expect(event1?.eventType).toBe('FILE_DETECTED');
+
+    // Second observation - same file, 35 seconds later (exceeds stability threshold of 30s)
+    const secondObservation: FileObservation = {
+      interfaceId: 'SA-034',
+      path: '/inbound/vendor-invoice-002.xlsx',
+      size: 2048, // Same size (stable)
+      modified: new Date('2026-07-16T11:00:00Z'), // Same modified time
+      observedAt: new Date('2026-07-16T11:00:35Z'),
+    };
+
+    const now2 = new Date('2026-07-16T11:00:35Z');
+    const event2 = await processObservation(secondObservation, testConfig, stateRepo, now2);
+
+    expect(event2?.eventType).toBe('FILE_STABLE');
+
+    // Verify state loaded correctly and transitioned
+    const finalState = await stateRepo.get('SA-034', '/inbound/vendor-invoice-002.xlsx');
+    expect(finalState?.currentStatus).toBe('FILE_STABLE');
+    expect(finalState?.previousStatus).toBe('FILE_DETECTED');
+    expect(finalState?.firstDetectedAt).toEqual(now1); // Preserved from first observation
+    expect(finalState?.statusChangedAt).toEqual(now2); // Updated on transition
+  });
+
+  it('should enforce valid state transitions', async () => {
+    const observation: FileObservation = {
+      interfaceId: 'SA-034',
+      path: '/inbound/test-transitions.xlsx',
+      size: 512,
+      modified: new Date('2026-07-16T12:00:00Z'),
+      observedAt: new Date('2026-07-16T12:00:00Z'),
+    };
+
+    const now = new Date('2026-07-16T12:00:00Z');
+
+    // First: FILE_DETECTED
+    const event1 = await processObservation(observation, testConfig, stateRepo, now);
+    expect(event1?.eventType).toBe('FILE_DETECTED');
+
+    // Verify transition to FILE_STABLE works
+    const stableObservation = {
+      ...observation,
+      observedAt: new Date('2026-07-16T12:00:35Z'),
+    };
+    const now2 = new Date('2026-07-16T12:00:35Z');
+    const event2 = await processObservation(stableObservation, testConfig, stateRepo, now2);
+    expect(event2?.eventType).toBe('FILE_STABLE');
+
+    // Verify final state has correct transition
+    const state = await stateRepo.get('SA-034', '/inbound/test-transitions.xlsx');
+    expect(state?.currentStatus).toBe('FILE_STABLE');
+    expect(state?.previousStatus).toBe('FILE_DETECTED');
+  });
+
+  it('should upsert state without creating duplicate rows', async () => {
+    const observation: FileObservation = {
+      interfaceId: 'SA-034',
+      path: '/inbound/upsert-test.xlsx',
+      size: 1024,
+      modified: new Date('2026-07-16T13:00:00Z'),
+      observedAt: new Date('2026-07-16T13:00:00Z'),
+    };
+
+    const now1 = new Date('2026-07-16T13:00:00Z');
+    await processObservation(observation, testConfig, stateRepo, now1);
+
+    // Process same file again (after stability threshold)
+    const now2 = new Date('2026-07-16T13:00:35Z');
+    const stableObservation = {
+      ...observation,
+      observedAt: now2,
+    };
+    await processObservation(stableObservation, testConfig, stateRepo, now2);
+
+    // Verify only one row exists
+    const allStates = await stateRepo.findByInterface('SA-034');
+    const matchingStates = allStates.filter((s) => s.filePath === '/inbound/upsert-test.xlsx');
+
+    expect(matchingStates).toHaveLength(1);
+    expect(matchingStates[0].currentStatus).toBe('FILE_STABLE');
   });
 });
