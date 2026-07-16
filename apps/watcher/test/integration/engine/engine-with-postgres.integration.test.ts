@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { processObservation } from '../../../src/engine/watcher-engine';
-import { checkMissingSla } from '../../../src/engine/missing-sla-sweep';
 import { PostgresStateRepository } from '../../../src/database/repositories/state.repository';
 import { InterfaceConfigRepository } from '../../../src/database/repositories/interface-config.repository';
 import { DatabaseClient } from '../../../src/database/client';
@@ -67,7 +66,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
   });
 
   afterAll(async () => {
-    // Don't close DB - other tests may still be using it (singleton + parallel execution)
+    await db.close();
   });
 
   it('should persist state to database on first observation', async () => {
