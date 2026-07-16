@@ -11,6 +11,7 @@
     "build": "tsc",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
+    "pretest": "npm run build -w @packages/contracts -w @packages/testing",
     "test": "vitest run"
   },
   "keywords": ["d365", "integration", "file-watcher"],
