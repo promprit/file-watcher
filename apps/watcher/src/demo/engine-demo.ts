@@ -102,6 +102,97 @@ async function runScenario1_DuplicateDetection(
   console.log(`  First detected: ${formatTime(finalState!.firstDetectedAt)}\n`);
 }
 
+async function runScenario2_StuckFile(
+  config: InterfaceConfig,
+  stateRepo: PostgresStateRepository,
+  startTime: Date
+): Promise<void> {
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('Scenario 2: Stuck File');
+  console.log('═══════════════════════════════════════════════════════════════\n');
+
+  const filePath = '/inbound/stuck-file.xlsx';
+  const fileSize = 2048;
+
+  // Observation 1: First detection
+  console.log(`[${formatTime(startTime)}] Processing observation 1: ${filePath} (${fileSize} bytes)`);
+
+  const observation1: FileObservation = {
+    interfaceId: config.interfaceId,
+    path: filePath,
+    size: fileSize,
+    modified: startTime,
+    observedAt: startTime,
+  };
+
+  const event1 = await processObservation(observation1, config, stateRepo, startTime);
+
+  if (event1) {
+    console.log(`  → Event: ${event1.eventType} (batch: ${event1.batchId})`);
+    console.log(`  → State saved to database\n`);
+  }
+
+  // Simulate 90 minutes passing (exceeds stuckThresholdSeconds: 3600 = 60 minutes)
+  await sleep(100);
+  const time2 = new Date(startTime.getTime() + 90 * 60 * 1000);
+
+  console.log(`[${formatTime(time2)}] Processing observation 2: ${filePath} (${fileSize} bytes, +90min)`);
+
+  const observation2: FileObservation = {
+    interfaceId: config.interfaceId,
+    path: filePath,
+    size: fileSize, // Same size (no growth)
+    modified: startTime, // Same modified time
+    observedAt: time2,
+  };
+
+  const event2 = await processObservation(observation2, config, stateRepo, time2);
+
+  if (event2) {
+    console.log(`  → Event: ${event2.eventType} (batch: ${event2.batchId})`);
+    console.log(`  → State updated: FILE_DETECTED → FILE_STUCK\n`);
+  }
+
+  // Show final state
+  const finalState = await stateRepo.get(config.interfaceId, filePath);
+  console.log('Final state in database:');
+  console.log(`  Interface: ${finalState?.interfaceId}`);
+  console.log(`  File: ${finalState?.filePath}`);
+  console.log(`  Status: ${finalState?.currentStatus}`);
+  console.log(`  Batch: ${finalState?.batchId}\n`);
+}
+
+async function runScenario3_MissingSLA(
+  config: InterfaceConfig,
+  stateRepo: PostgresStateRepository,
+  startTime: Date
+): Promise<void> {
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('Scenario 3: Missing by SLA');
+  console.log('═══════════════════════════════════════════════════════════════\n');
+
+  // Time is after SLA deadline (18:00 UTC)
+  const checkTime = new Date('2026-07-16T18:30:00Z');
+
+  console.log(`[${formatTime(checkTime)}] Checking for missing files (SLA deadline: ${config.slaDeadline})`);
+
+  // No files arrived today - should trigger FILE_MISSING_BY_SLA
+  const events = await checkMissingSla(config, stateRepo, checkTime);
+
+  if (events.length > 0) {
+    console.log(`  → Event: ${events[0].eventType} (batch: ${events[0].batchId})`);
+    console.log(`  → Expected file never arrived\n`);
+  }
+
+  // Show sentinel state
+  const sentinelState = await stateRepo.get(config.interfaceId, '__sla_window__');
+  console.log('Final state in database:');
+  console.log(`  Interface: ${sentinelState?.interfaceId}`);
+  console.log(`  File: ${sentinelState?.filePath} (sentinel)`);
+  console.log(`  Status: ${sentinelState?.currentStatus}`);
+  console.log(`  Batch: ${sentinelState?.batchId}\n`);
+}
+
 async function main() {
   console.log('🚀 Engine + PostgresStateRepository Integration Demo\n');
 
@@ -130,10 +221,14 @@ async function main() {
 
     const startTime = new Date('2026-07-16T10:00:00Z');
 
-    // Run Scenario 1
+    // Run all 3 scenarios
     await runScenario1_DuplicateDetection(config, stateRepo, startTime);
 
-    // Scenarios 2 & 3 will be added in Task 5
+    await runScenario2_StuckFile(config, stateRepo, new Date('2026-07-16T11:00:00Z'));
+
+    // Clean state before Scenario 3 (SLA check expects no files today)
+    await db.query('TRUNCATE TABLE watcher_schema.watcher_state CASCADE');
+    await runScenario3_MissingSLA(config, stateRepo, new Date('2026-07-16T18:30:00Z'));
 
     // Close connection
     await DatabaseClient.getInstance().close();
