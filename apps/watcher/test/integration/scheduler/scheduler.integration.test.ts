@@ -7,6 +7,7 @@ import { InterfaceConfigRepository } from '../../../src/database/repositories/in
 import { ConnectionConfigRepository } from '../../../src/database/repositories/connection-config.repository';
 import { PostgresStateRepository } from '../../../src/database/repositories/state.repository';
 import { folderAdapter } from '../../../src/adapters/folder/folder.adapter';
+import { AdapterError } from '../../../src/adapters/adapter';
 import { runOnce, type EngineDefaults } from '../../../src/scheduler/scheduler';
 import type { FileEvent } from '@packages/contracts';
 
@@ -148,6 +149,8 @@ describe('Scheduler runOnce', () => {
 
     const result = results.find((r) => r.interfaceId === 'SCHED-TEST-BADCONN');
     expect(result?.status).toBe('error');
+    expect(result?.error).toBeInstanceOf(Error);
+    expect((result?.error as Error).message).toContain('sched-test-conn-does-not-exist');
   });
 
   it('records an error result for an unsupported storage type', async () => {
@@ -170,6 +173,8 @@ describe('Scheduler runOnce', () => {
 
     const result = results.find((r) => r.interfaceId === 'SCHED-TEST-SFTP');
     expect(result?.status).toBe('error');
+    expect(result?.error).toBeInstanceOf(Error);
+    expect((result?.error as Error).message).toContain('SFTP');
   });
 
   it('records an error result when the adapter throws (nonexistent inboundPath)', async () => {
@@ -192,6 +197,7 @@ describe('Scheduler runOnce', () => {
 
     const result = results.find((r) => r.interfaceId === 'SCHED-TEST-BADPATH');
     expect(result?.status).toBe('error');
+    expect(result?.error).toBeInstanceOf(AdapterError);
   });
 
   it('processes multiple interfaces independently: one fails, one succeeds', async () => {
@@ -223,6 +229,7 @@ describe('Scheduler runOnce', () => {
     const badResult = results.find((r) => r.interfaceId === 'SCHED-TEST-MIXED-BAD');
     expect(okResult?.status).toBe('ok');
     expect(badResult?.status).toBe('error');
+    expect((badResult?.error as Error).message).toContain('sched-test-conn-mixed-does-not-exist');
     expect(events.some((e) => e.interfaceId === 'SCHED-TEST-MIXED-OK')).toBe(true);
   });
 
