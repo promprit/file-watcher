@@ -75,8 +75,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
       interfaceId: 'SA-034',
       path: '/inbound/vendor-invoice-001.xlsx',
       size: 1024,
-      modified: new Date('2026-07-16T10:00:00Z'),
-      observedAt: new Date('2026-07-16T10:00:00Z'),
+      mtime: new Date('2026-07-16T10:00:00Z'),
     };
 
     const now = new Date('2026-07-16T10:00:00Z');
@@ -106,8 +105,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
       interfaceId: 'SA-034',
       path: '/inbound/vendor-invoice-002.xlsx',
       size: 2048,
-      modified: new Date('2026-07-16T11:00:00Z'),
-      observedAt: new Date('2026-07-16T11:00:00Z'),
+      mtime: new Date('2026-07-16T11:00:00Z'),
     };
 
     const now1 = new Date('2026-07-16T11:00:00Z');
@@ -119,8 +117,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
       interfaceId: 'SA-034',
       path: '/inbound/vendor-invoice-002.xlsx',
       size: 2048, // Same size (stable)
-      modified: new Date('2026-07-16T11:00:00Z'), // Same modified time
-      observedAt: new Date('2026-07-16T11:00:35Z'),
+      mtime: new Date('2026-07-16T11:00:00Z'), // Same mtime (file hasn't changed)
     };
 
     const now2 = new Date('2026-07-16T11:00:35Z');
@@ -141,8 +138,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
       interfaceId: 'SA-034',
       path: '/inbound/test-transitions.xlsx',
       size: 512,
-      modified: new Date('2026-07-16T12:00:00Z'),
-      observedAt: new Date('2026-07-16T12:00:00Z'),
+      mtime: new Date('2026-07-16T12:00:00Z'),
     };
 
     const now = new Date('2026-07-16T12:00:00Z');
@@ -151,13 +147,9 @@ describe('Engine + PostgresStateRepository Integration', () => {
     const event1 = await processObservation(observation, testConfig, stateRepo, now);
     expect(event1?.eventType).toBe('FILE_DETECTED');
 
-    // Verify transition to FILE_STABLE works
-    const stableObservation = {
-      ...observation,
-      observedAt: new Date('2026-07-16T12:00:35Z'),
-    };
+    // Verify transition to FILE_STABLE works (same file, unchanged, observed 35s later)
     const now2 = new Date('2026-07-16T12:00:35Z');
-    const event2 = await processObservation(stableObservation, testConfig, stateRepo, now2);
+    const event2 = await processObservation(observation, testConfig, stateRepo, now2);
     expect(event2?.eventType).toBe('FILE_STABLE');
 
     // Verify final state has correct transition
@@ -171,8 +163,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
       interfaceId: 'SA-034',
       path: '/inbound/upsert-test.xlsx',
       size: 1024,
-      modified: new Date('2026-07-16T13:00:00Z'),
-      observedAt: new Date('2026-07-16T13:00:00Z'),
+      mtime: new Date('2026-07-16T13:00:00Z'),
     };
 
     const now1 = new Date('2026-07-16T13:00:00Z');
@@ -180,11 +171,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
 
     // Process same file again (after stability threshold)
     const now2 = new Date('2026-07-16T13:00:35Z');
-    const stableObservation = {
-      ...observation,
-      observedAt: now2,
-    };
-    await processObservation(stableObservation, testConfig, stateRepo, now2);
+    await processObservation(observation, testConfig, stateRepo, now2);
 
     // Verify only one row exists
     const allStates = await stateRepo.findByInterface('SA-034');
@@ -218,8 +205,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
       interfaceId: 'SA-034',
       path: '/inbound/batch-id-test.xlsx',
       size: 1024,
-      modified: new Date('2026-07-16T14:00:00Z'),
-      observedAt: new Date('2026-07-16T14:00:00Z'),
+      mtime: new Date('2026-07-16T14:00:00Z'),
     };
 
     const now1 = new Date('2026-07-16T14:00:00Z');
@@ -228,8 +214,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
 
     // Transition to FILE_STABLE
     const now2 = new Date('2026-07-16T14:00:35Z');
-    const stableObservation = { ...observation, observedAt: now2 };
-    const event2 = await processObservation(stableObservation, testConfig, stateRepo, now2);
+    const event2 = await processObservation(observation, testConfig, stateRepo, now2);
     const batchId2 = event2?.batchId;
 
     // Batch ID should be reused
@@ -245,8 +230,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
       interfaceId: 'SA-034',
       path: '/inbound/timestamp-test.xlsx',
       size: 2048,
-      modified: new Date('2026-07-16T15:00:00Z'),
-      observedAt: new Date('2026-07-16T15:00:00Z'),
+      mtime: new Date('2026-07-16T15:00:00Z'),
     };
 
     const firstDetectedTime = new Date('2026-07-16T15:00:00Z');
@@ -254,8 +238,7 @@ describe('Engine + PostgresStateRepository Integration', () => {
 
     // Update after 35 seconds
     const stableTime = new Date('2026-07-16T15:00:35Z');
-    const stableObservation = { ...observation, observedAt: stableTime };
-    await processObservation(stableObservation, testConfig, stateRepo, stableTime);
+    await processObservation(observation, testConfig, stateRepo, stableTime);
 
     // Verify timestamps from database
     const state = await stateRepo.get('SA-034', '/inbound/timestamp-test.xlsx');
