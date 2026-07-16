@@ -6,7 +6,8 @@
     "migrate:down": "node-pg-migrate down --database-url-var DATABASE_URL --migrations-dir src/database/migrations",
     "migrate:create": "node-pg-migrate create --migrations-dir src/database/migrations",
     "test:integration": "vitest run",
-    "test:integration:watch": "vitest"
+    "test:integration:watch": "vitest",
+    "demo": "vite-node src/demo/engine-demo.ts"
   },
   "dependencies": {
     "pg": "^8.11.0",
