@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { processObservation } from '../../../src/engine/watcher-engine';
+import { checkMissingSla } from '../../../src/engine/missing-sla-sweep';
 import { PostgresStateRepository } from '../../../src/database/repositories/state.repository';
 import { InterfaceConfigRepository } from '../../../src/database/repositories/interface-config.repository';
 import { DatabaseClient } from '../../../src/database/client';
@@ -191,5 +192,76 @@ describe('Engine + PostgresStateRepository Integration', () => {
 
     expect(matchingStates).toHaveLength(1);
     expect(matchingStates[0].currentStatus).toBe('FILE_STABLE');
+  });
+
+  it('should query database for missing SLA check', async () => {
+    // Set time to after SLA deadline (18:00 UTC)
+    const now = new Date('2026-07-16T18:30:00Z');
+
+    // No files arrived today - should trigger FILE_MISSING_BY_SLA
+    const events = await checkMissingSla(testConfig, stateRepo, now);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].eventType).toBe('FILE_MISSING_BY_SLA');
+    expect(events[0].interfaceId).toBe('SA-034');
+
+    // Verify sentinel state persisted to database
+    const sentinelState = await stateRepo.get('SA-034', '__sla_window__');
+    expect(sentinelState).not.toBeNull();
+    expect(sentinelState?.currentStatus).toBe('FILE_MISSING_BY_SLA');
+    expect(sentinelState?.fileName).toBe('__sla_window__');
+    expect(sentinelState?.fileSizeBytes).toBe(0);
+  });
+
+  it('should reuse batch ID across state transitions for same file', async () => {
+    const observation: FileObservation = {
+      interfaceId: 'SA-034',
+      path: '/inbound/batch-id-test.xlsx',
+      size: 1024,
+      modified: new Date('2026-07-16T14:00:00Z'),
+      observedAt: new Date('2026-07-16T14:00:00Z'),
+    };
+
+    const now1 = new Date('2026-07-16T14:00:00Z');
+    const event1 = await processObservation(observation, testConfig, stateRepo, now1);
+    const batchId1 = event1?.batchId;
+
+    // Transition to FILE_STABLE
+    const now2 = new Date('2026-07-16T14:00:35Z');
+    const stableObservation = { ...observation, observedAt: now2 };
+    const event2 = await processObservation(stableObservation, testConfig, stateRepo, now2);
+    const batchId2 = event2?.batchId;
+
+    // Batch ID should be reused
+    expect(batchId2).toBe(batchId1);
+
+    // Verify in database
+    const state = await stateRepo.get('SA-034', '/inbound/batch-id-test.xlsx');
+    expect(state?.batchId).toBe(batchId1);
+  });
+
+  it('should persist all timestamps correctly', async () => {
+    const observation: FileObservation = {
+      interfaceId: 'SA-034',
+      path: '/inbound/timestamp-test.xlsx',
+      size: 2048,
+      modified: new Date('2026-07-16T15:00:00Z'),
+      observedAt: new Date('2026-07-16T15:00:00Z'),
+    };
+
+    const firstDetectedTime = new Date('2026-07-16T15:00:00Z');
+    await processObservation(observation, testConfig, stateRepo, firstDetectedTime);
+
+    // Update after 35 seconds
+    const stableTime = new Date('2026-07-16T15:00:35Z');
+    const stableObservation = { ...observation, observedAt: stableTime };
+    await processObservation(stableObservation, testConfig, stateRepo, stableTime);
+
+    // Verify timestamps from database
+    const state = await stateRepo.get('SA-034', '/inbound/timestamp-test.xlsx');
+
+    expect(state?.firstDetectedAt).toEqual(firstDetectedTime); // Never changes
+    expect(state?.statusChangedAt).toEqual(stableTime); // Updates on transition
+    expect(state?.lastSeenAt).toEqual(stableTime); // Updates on each observation
   });
 });
