@@ -8,5 +8,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    include: ['test/integration/database/**/*.test.ts'],
   },
 });

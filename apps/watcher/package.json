@@ -5,11 +5,12 @@
     "migrate:up": "node-pg-migrate up --database-url-var DATABASE_URL --migrations-dir src/database/migrations",
     "migrate:down": "node-pg-migrate down --database-url-var DATABASE_URL --migrations-dir src/database/migrations",
     "migrate:create": "node-pg-migrate create --migrations-dir src/database/migrations",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test:integration": "vitest run",
+    "test:integration:watch": "vitest"
   },
   "dependencies": {
-    "pg": "^8.11.0"
+    "pg": "^8.11.0",
+    "@packages/contracts": "*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

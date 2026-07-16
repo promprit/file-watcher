@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "description": "File Watcher Service for D365 Integration Monitoring",
   "main": "dist/index.js",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "pretest": "npm run build -w @packages/contracts -w @packages/testing",
+    "test": "vitest run"
   },
   "keywords": ["d365", "integration", "file-watcher"],
   "author": "Napas Jutha <napasjutha@gmail.com>",
@@ -19,7 +25,9 @@
     "@types/node": "^20.0.0",
     "@types/pg": "^8.10.0",
     "ts-node": "^10.9.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^1.6.0",
+    "vite-tsconfig-paths": "^4.3.0"
   },
   "engines": {
     "node": ">=18.0.0"

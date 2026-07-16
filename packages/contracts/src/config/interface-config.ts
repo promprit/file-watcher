@@ -110,4 +110,21 @@ export interface InterfaceConfig {
    * If false, the Watcher will skip this interface during polling cycles.
    */
   enabledFlag: boolean;
+
+  /**
+   * Threshold in seconds after which a file is marked FILE_STUCK if not
+   * updated. Engine-specific field (MVP model) — coexists with
+   * stuckThresholdMinutes above, which is DB-schema-shaped and not yet
+   * consumed by any rule. Always active (unlike stuckThresholdMinutes,
+   * which is nullable/disable-able).
+   */
+  stuckThresholdSeconds: number;
+
+  /**
+   * Expected daily arrival deadline in "HH:mm" 24-hour UTC. Engine-specific
+   * field (MVP model) — coexists with expectedSchedule/slaThresholdMinutes
+   * above, which is a more expressive but not-yet-implemented schedule
+   * format. Not local time — see missing-sla-sweep.ts.
+   */
+  slaDeadline: string;
 }

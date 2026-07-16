@@ -2,8 +2,16 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "paths": {
+      "@packages/contracts": ["../../packages/contracts/src/index.ts"],
+      "@packages/testing": ["../../packages/testing/src/index.ts"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test"]
+  "exclude": ["node_modules", "dist", "test"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/testing" }
+  ]
 }
