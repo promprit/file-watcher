@@ -88,6 +88,20 @@ describe('folderAdapter.observe', () => {
     expect(result[0].path).toBe(path.join(subDir, 'invoice_1.csv'));
   });
 
+  it('returns an empty array when the directory has no matching files', async () => {
+    fs.writeFileSync(path.join(tempDir, 'readme.txt'), 'ignore me');
+
+    const result = await folderAdapter.observe(makeContext(tempDir), makeScope());
+
+    expect(result).toEqual([]);
+  });
+
+  it('throws AdapterError when filePattern is not a valid regex', async () => {
+    await expect(
+      folderAdapter.observe(makeContext(tempDir), makeScope({ filePattern: '[' }))
+    ).rejects.toThrow(AdapterError);
+  });
+
   it('throws AdapterError when the directory does not exist', async () => {
     await expect(
       folderAdapter.observe(makeContext(path.join(tempDir, 'does-not-exist')), makeScope())

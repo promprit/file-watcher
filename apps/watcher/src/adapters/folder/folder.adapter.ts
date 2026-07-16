@@ -14,7 +14,12 @@ export const folderAdapter: Adapter = {
       throw new AdapterError(context.connectionRef, scope.interfaceId, cause);
     }
 
-    const pattern = new RegExp(scope.filePattern);
+    let pattern: RegExp;
+    try {
+      pattern = new RegExp(scope.filePattern);
+    } catch (cause) {
+      throw new AdapterError(context.connectionRef, scope.interfaceId, cause);
+    }
     const matches = entries.filter((name) => pattern.test(name));
 
     const observations: FileObservation[] = [];
