@@ -14,19 +14,18 @@ C# port of the frozen TypeScript Watcher Engine (`apps/watcher/src/engine/`), pe
   executing the TS reference engine (`npm run parity:vectors -w @apps/watcher`).
   Plus property tests for the random-ID cases.
 
-## Status / caveat
+## Status
 
-The vectors are generated and verified against the reference engine in this repo's CI-able
-toolchain. The C# projects however have **not been compiled here** — this sandbox has no
-.NET SDK (network policy blocks the Microsoft download hosts). First `dotnet test` run
-happens in the client dev environment:
+✅ **Green: 43/43 tests passing** (.NET SDK 8.0.129, Ubuntu package, 2026-07-17) — every
+vectorized case matches the TS reference engine, first compile. All rows in
+[`engine-test-parity.md`](../docs/superpowers/specs/parity/engine-test-parity.md) are ticked.
 
 ```bash
 dotnet test d365/FileWatcherMonitoring.Plugins.Tests
 ```
 
-When it's green, tick the matching rows in
-[`docs/superpowers/specs/parity/engine-test-parity.md`](../docs/superpowers/specs/parity/engine-test-parity.md).
+After any engine change (spec-ambiguity fixes only — the engine is frozen): update TS + spec
+together, `npm run parity:vectors -w @apps/watcher`, then re-run both suites.
 
 ## What's deliberately NOT here (built in the client environment)
 
