@@ -19,3 +19,4 @@ dist/
 # .NET (d365 C# port)
 d365/**/bin/
 d365/**/obj/
+__pycache__/
