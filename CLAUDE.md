@@ -51,9 +51,9 @@ cp .env.example .env       # local env file (gitignored)
 docker compose -f infrastructure/compose/docker-compose.yml up -d   # Postgres 15 + Redis 7 for the reference suite
 ```
 
-No lint/typecheck scripts exist. **README.md is stale:** it says `docker compose up -d` and
-references `docker/init.sql`; the real paths are `infrastructure/compose/docker-compose.yml`
-and `infrastructure/docker/init.sql`.
+No lint/typecheck scripts exist. C# suites: `dotnet test d365/FileWatcherMonitoring.Plugins.Tests`
+(vector parity) and `dotnet test d365/FileWatcherMonitoring.Dataverse.Tests` (plugin layer).
+Plain-language runtime walkthrough for onboarding: [`docs/how-it-works.md`](docs/how-it-works.md).
 
 ## What lives where
 

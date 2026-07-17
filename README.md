@@ -1,122 +1,54 @@
-# File Watcher / D365 Integration Engine
+# File Watcher — D365-native Integration Monitoring
 
-File monitoring service for D365 Finance & Operations integration. Watches file sources
-(SFTP / Blob / SharePoint / local folder), detects lifecycle events (new file arrived, file
-stable, duplicate, stuck, missing by SLA), and delivers those events reliably to D365 via a
-Gateway middleware layer.
+File monitoring for D365 Finance & Operations integrations, built **entirely inside D365**:
+Dataverse tables (the database), a C# plugin (the logic), Power Automate flows (the file
+watchers), and a model-driven Power App (config + monitoring UI). **Zero servers** — nothing
+hosted outside the client's D365 environment and Power Platform.
 
-## Architecture
+It watches file sources (SFTP / Azure Blob / SharePoint / on-prem folders), tracks each
+file's lifecycle (`FILE_DETECTED`, `FILE_STABLE`, `FILE_DUPLICATE`, `FILE_STUCK`,
+`FILE_MISSING_BY_SLA`), and alerts owners when feeds are stuck or missed their SLA.
 
-Two deployable services + one shared contracts package:
+**Start here:**
+- [How it works](docs/how-it-works.md) — plain-language runtime walkthrough
+- [Design spec](docs/superpowers/specs/2026-07-17-d365-native-architecture-design.md) — normative architecture
+- [Deploy quickstart](d365/deploy/README.md) — plug & play into any Dataverse environment
+- [Flow runbook](docs/superpowers/plans/2026-07-17-flow-runbook.md) — maker-portal steps
 
-- **Watcher** (`apps/watcher/`) — polls configured file sources via adapters, runs each
-  observation through the Watcher Engine to decide lifecycle events
-  (`FILE_DETECTED`, `FILE_STABLE`, `FILE_DUPLICATE`, `FILE_STUCK`, `FILE_MISSING_BY_SLA`),
-  persists its own operational state (`watcher_state`), and POSTs `FileEvent`s to the Gateway.
-- **Gateway** (`apps/gateway/`) — receives `FileEvent`s over HTTP, validates/enriches/masks
-  them, persists to an outbox (`event_outbox`) *before* ACKing the Watcher, then delivers to
-  D365 via a pluggable sink (`sinks/d365/`) with retry and dead-lettering
-  (`dead_letter_event`).
-- **`packages/contracts/`** — shared types (`FileObservation`, `FileEvent`, `InterfaceConfig`,
-  `ConnectionConfig`) so Watcher and Gateway can't drift on event shape.
+## Repo layout
 
-Watcher never talks to D365 directly — only the Gateway's sink does. The outbox pattern means
-a Gateway crash mid-flight doesn't lose events (Watcher retries, Gateway dedupes on
-`event_id`).
+| Path | What | Status |
+|---|---|---|
+| `d365/FileWatcherMonitoring.Plugins/` | C# engine core (rules, transition allow-list, sweep) | **Production source** — deployed as plugin |
+| `d365/FileWatcherMonitoring.Dataverse/` | Plugin wrappers, `DataverseStateRepository`, Custom API | **Production source** — signed self-contained DLL |
+| `d365/FileWatcherMonitoring.*.Tests/` | 43 parity tests + 12 plugin-layer tests | CI |
+| `d365/deploy/provision.py` | One-shot idempotent environment provisioning (tables, choice, keys, plugin, Custom API) | CI-adjacent tooling |
+| `apps/watcher/src/engine/` | **Frozen TypeScript reference engine** + 81 tests — the executable spec the C# port must match | Reference only, no new features |
+| `apps/watcher/src/parity/` | Generates shared test vectors by executing the reference engine | Tooling |
+| `docs/superpowers/` | Design specs + implementation plans (dated; superseded ones carry banners) | Docs |
+| `packages/contracts/`, `apps/watcher/src/{adapters,scheduler,database}/` | Pre-pivot TS, kept for the reference suite | Reference only |
+| `infrastructure/` | Local Postgres/Redis for the reference suite's integration tests only | Dev only |
 
-Full design, rationale, data flow, and MVP scope:
-[`docs/monorepo-architecture.md`](docs/monorepo-architecture.md).
+## Verify everything (three suites)
 
-## Repo state: mid-migration
-
-This repo is transitioning from a flat single-app layout to an npm-workspaces monorepo. Both
-exist side by side right now:
-
-- **Root (legacy, functional):** `package.json`, `src/index.ts`, `tsconfig.json` — a
-  placeholder entry point that logs and exits. Builds and runs today via the commands below.
-- **`apps/watcher/`, `apps/gateway/`, `packages/contracts/`, `packages/observability/`,
-  `packages/testing/`** — target monorepo structure. Currently empty `.gitkeep` stubs: no
-  code, no per-package `package.json`/`tsconfig.json`, and the root `package.json` doesn't
-  have an npm `workspaces` field wired up yet.
-
-New implementation code belongs under `apps/*` or `packages/*`, not root `src/`.
-
-No test runner, lint, or typecheck script exists yet — don't assume `npm test` or
-`npm run lint` work.
-
-## Prerequisites
-
-- Docker Desktop
-- Node.js LTS (via nvm)
-- Git
-
-## Setup
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Copy environment file:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Start infrastructure (Postgres 15 + Redis 7):
-   ```bash
-   docker compose -f infrastructure/compose/docker-compose.yml up -d
-   ```
-
-4. Verify containers healthy:
-   ```bash
-   docker compose -f infrastructure/compose/docker-compose.yml ps
-   ```
-
-5. Build project:
-   ```bash
-   npm run build
-   ```
-
-## Development
-
-- `npm run dev` — run with ts-node (no compilation)
-- `npm run build` — compile TypeScript, `src/` -> `dist/`
-- `npm start` — run compiled output (`dist/index.js`)
-
-## Project Structure
-
-```
-file-watcher/
-├── apps/
-│   ├── watcher/                # Watcher service (target monorepo, currently .gitkeep stub)
-│   └── gateway/                # Gateway service (target monorepo, currently .gitkeep stub)
-├── packages/
-│   ├── contracts/               # Shared event/config types (stub)
-│   ├── observability/           # Shared logging/tracing/metrics (stub)
-│   └── testing/                 # Shared test utilities (stub)
-├── infrastructure/
-│   ├── compose/
-│   │   └── docker-compose.yml   # Postgres + Redis for local dev
-│   └── docker/
-│       └── init.sql             # DB bootstrap (local dev only)
-├── docs/
-│   ├── monorepo-architecture.md # Full architecture spec
-│   └── superpowers/specs/       # Design specs for individual components
-├── src/
-│   └── index.ts                 # Legacy root entry point (placeholder)
-├── .env.example                 # Environment template
-├── package.json                 # Root deps & scripts (no workspaces field yet)
-├── tsconfig.json
-└── README.md                    # This file
+```bash
+npm install && npm test                                     # 81 TS reference tests
+npm run parity:vectors -w @apps/watcher                     # regenerate shared vectors (idempotent)
+dotnet test d365/FileWatcherMonitoring.Plugins.Tests        # 43 vector-driven parity tests
+dotnet test d365/FileWatcherMonitoring.Dataverse.Tests      # 12 plugin-layer tests (fake IOrganizationService)
+dotnet build d365/FileWatcherMonitoring.Dataverse -c Release # the deployable plugin DLL
 ```
 
-## Next Steps
+CI (`.github/workflows/ci.yml`) runs all of the above plus a vector-drift check on every push.
 
-See [`docs/monorepo-architecture.md`](docs/monorepo-architecture.md) for the full roadmap.
-Near-term:
+## History
 
-1. Scaffold monorepo structure (per-package `package.json`/`tsconfig.json`, npm `workspaces`)
-2. Implement `packages/contracts` (event schemas)
-3. Implement Watcher MVP (scheduler, SFTP adapter, engine, state store)
-4. Implement Gateway MVP (API, outbox, D365 sink)
-5. Integration testing (Watcher → Gateway → D365)
+The system was originally designed as two external Node services (Watcher + Gateway) — that
+design is preserved in [`docs/monorepo-architecture.md`](docs/monorepo-architecture.md)
+(superseded 2026-07-17). The pivot rationale in one line: moving the logic inside Dataverse
+puts the state update and event insert in one transaction, which makes the entire
+Gateway/outbox/retry layer unnecessary.
+
+Reference-suite integration tests (optional, need Docker):
+`docker compose -f infrastructure/compose/docker-compose.yml up -d`, then
+`npm run test:integration -w @apps/watcher` (needs `DATABASE_URL`, see `.env.example`).
