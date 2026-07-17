@@ -40,10 +40,19 @@ dotnet test d365/FileWatcherMonitoring.Plugins.Tests
 After any engine change (spec-ambiguity fixes only — the engine is frozen): update TS + spec
 together, `npm run parity:vectors -w @apps/watcher`, then re-run both suites.
 
-## What's deliberately NOT here (built in the client environment)
+## Test coverage map
 
-- The `IPlugin` wrapper on `fwm_fileobservation` Create (hydrates `InterfaceConfig` from the
-  lookup, calls `WatcherEngine.ProcessObservation`, writes state + event in-transaction).
-- `DataverseStateRepository : IStateRepository` (alternate-key upsert via `IOrganizationService`).
-- Custom API registrations (`fwm_ProcessObservation`, `fwm_CheckMissingSla`), strong-name key,
-  Dataverse SDK package references, FakeXrmEasy plugin-level tests.
+- `FileWatcherMonitoring.Plugins.Tests` — engine semantics: 43 vector-driven cases proving
+  the C# engine identical to the TS reference.
+- `FileWatcherMonitoring.Dataverse.Tests` — plugin layer: 12 cases running
+  `DataverseStateRepository` / `ObservationProcessor` / `SweepProcessor` against a
+  hand-rolled in-memory `FakeOrganizationService` (alternate-key upsert emulated;
+  net8 via the `Microsoft.PowerPlatform.Dataverse.Client` build of `Microsoft.Xrm.Sdk`,
+  so it runs cross-platform — no FakeXrmEasy license needed). The `IPlugin` wrappers
+  themselves are thin pipeline plumbing, exercised only in a real environment.
+
+## What's deliberately NOT here (done in the client environment)
+
+- Plugin/step/Custom-API **registration** (automated by `deploy/provision.py`) and the
+  in-environment smoke test.
+- Flows, model-driven app, security roles, bulk-delete job (see the flow runbook).

@@ -1,20 +1,20 @@
 using System;
 using Microsoft.Xrm.Sdk;
-using FileWatcherMonitoring.Plugins;
 
 namespace FileWatcherMonitoring.Dataverse
 {
     /// <summary>
     /// Backing plugin for Custom API fwm_CheckMissingSla.
     ///
-    /// Custom API definition (created in the maker portal or via solution):
+    /// Custom API definition (created by d365/deploy/provision.py):
     ///   Unique name: fwm_CheckMissingSla
     ///   Request parameter:  InterfaceId (String, required) — business id, e.g. "SA-034"
     ///   Response property:  EventCount  (Integer)
     ///
-    /// Called per enabled interface by the scheduled missing-SLA sweep flow. The
-    /// sweep itself pages nothing here — one interface per call keeps each
-    /// execution far under the 2-minute plugin budget.
+    /// Called per enabled interface by the scheduled missing-SLA sweep flow.
+    /// Thin wrapper: logic lives in SweepProcessor (unit-tested against a fake
+    /// IOrganizationService). One interface per call keeps each execution far
+    /// under the 2-minute plugin budget.
     /// </summary>
     public class CheckMissingSlaPlugin : IPlugin
     {
@@ -32,17 +32,7 @@ namespace FileWatcherMonitoring.Dataverse
                 throw new InvalidPluginExecutionException("fwm_CheckMissingSla requires the InterfaceId parameter.");
             }
 
-            var config = ConfigLoader.LoadByInterfaceId(service, interfaceId);
-
-            var sweep = new MissingSlaSweep(new DataverseStateRepository(service));
-            var events = sweep.CheckMissingSla(config, DateTime.UtcNow);
-
-            foreach (var fileEvent in events)
-            {
-                service.Create(EventWriter.ToEntity(fileEvent));
-            }
-
-            context.OutputParameters["EventCount"] = events.Length;
+            context.OutputParameters["EventCount"] = SweepProcessor.Run(service, interfaceId, DateTime.UtcNow);
         }
     }
 }

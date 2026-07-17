@@ -4,6 +4,27 @@ Everything below runs against the client's environment; total hands-on time ≈ 
 plus flow creation. Prereqs: System Customizer/Admin in the target environment,
 Python 3.8+, .NET 8 SDK, Azure CLI (for the token).
 
+## 0. Find your Dataverse URL (F&O clients read this first)
+
+`provision.py` targets **Dataverse**, not F&O itself. F&O and Dataverse are two
+runtimes under one environment: F&O answers on `*.operations.dynamics.com` (no
+custom-table API), Dataverse on `*.crm.dynamics.com` (tables, plugins, flows —
+everything this solution is). "We only have F&O" almost always means the Dataverse
+half exists but nobody has looked:
+
+1. Open `admin.powerplatform.microsoft.com` → **Environments** → find the
+   environment matching the F&O environment name → **Environment URL** =
+   `https://something.crm.dynamics.com`. That's your `--url`.
+2. F&O environments deployed via PPAC (2023+) have linked Dataverse **by default**.
+3. Older LCS-deployed F&O: LCS → environment page → **Power Platform Integration**
+   → if empty, click **Setup** (free, ~1 hour, no new infrastructure).
+4. Fallback if linking is blocked: any Power Platform environment with a Dataverse
+   database works (PPAC → New environment → Dataverse: yes). The watcher is
+   self-contained; forward events to F&O later via the Fin & Ops connector if needed.
+
+The person running the script needs the **System Customizer** security role in that
+Dataverse environment — an F&O admin role does not grant it automatically.
+
 ## 1. Build the signed plugin DLL
 
 ```bash

@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - The TS code is the behavioral truth. Port semantics case-for-case; on any ambiguity, fix TS + spec together first, then port.
-- C# project layout: `FileWatcherMonitoring.Plugins` (engine + plugin + Custom APIs) and `FileWatcherMonitoring.Plugins.Tests` (FakeXrmEasy). No business logic in flows — flows only observe and normalize.
+- C# project layout: `FileWatcherMonitoring.Plugins` (engine core), `FileWatcherMonitoring.Dataverse` (repository + processors + IPlugin wrappers), `FileWatcherMonitoring.Plugins.Tests` (vector parity), `FileWatcherMonitoring.Dataverse.Tests` (fake `IOrganizationService`). No business logic in flows — flows only observe and normalize.
 - All time-dependent logic takes `IClock` (never `DateTime.UtcNow` inline) — the port of `packages/testing/fake-clock.ts`.
 - Enum values, status names, and error semantics keep their exact TS names (`FILE_DETECTED`, …) as Dataverse choice labels and C# enum members.
 
@@ -59,7 +59,7 @@ Source → target, signatures preserved:
 Source: `engine/state/state-repository.ts` (interface), `engine/state/in-memory-state-repository.ts`, `database/repositories/state.repository.ts`, `database/client.ts`, `database/migrations/*`
 
 - [x] `IStateRepository` — same contract as TS (`d365/FileWatcherMonitoring.Plugins/Contracts.cs`)
-- [x] `DataverseStateRepository` against `IOrganizationService`: alternate-key `UpsertRequest` (replaces Postgres `ON CONFLICT DO UPDATE`), pipeline-transactional — written and **compiled against Microsoft.CrmSdk.CoreAssemblies** (`d365/FileWatcherMonitoring.Dataverse/`); behavioral verification with FakeXrmEasy happens in the client env
+- [x] `DataverseStateRepository` against `IOrganizationService`: alternate-key `UpsertRequest` (replaces Postgres `ON CONFLICT DO UPDATE`), pipeline-transactional — written, compiled against `Microsoft.CrmSdk.CoreAssemblies`, and **behaviorally verified**: `FileWatcherMonitoring.Dataverse.Tests` (12 cases, fake `IOrganizationService`) covers repository roundtrip/upsert/choice mapping plus the full `ObservationProcessor`/`SweepProcessor` paths
 - [x] No migration-framework port: table definitions live in the solution; `client.ts` pooling has no equivalent (platform-managed)
 - [x] Postgres repos (`interface-config.repository.ts`, `connection-config.repository.ts`) are not ported as classes — the plugin reads the `fwm_interface` row via the observation's lookup; flows query `fwm_interface`/`fwm_connection` directly
 

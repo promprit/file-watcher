@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.8.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1" />
+    <!-- Ships the .NET (Core) build of Microsoft.Xrm.Sdk so the Dataverse-layer
+         sources compile and run under net8 xunit on any OS. The plugin assembly
+         itself still targets net462 via Microsoft.CrmSdk.CoreAssemblies. -->
+    <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.1.32" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../FileWatcherMonitoring.Plugins/FileWatcherMonitoring.Plugins.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test the real Dataverse-layer sources (not the IPlugin wrappers — those are
+         pipeline plumbing only and need the net462 pipeline types). -->
+    <Compile Include="../FileWatcherMonitoring.Dataverse/Schema.cs" Link="Dataverse/Schema.cs" />
+    <Compile Include="../FileWatcherMonitoring.Dataverse/DataverseStateRepository.cs" Link="Dataverse/DataverseStateRepository.cs" />
+    <Compile Include="../FileWatcherMonitoring.Dataverse/Processors.cs" Link="Dataverse/Processors.cs" />
+  </ItemGroup>
+
+</Project>
