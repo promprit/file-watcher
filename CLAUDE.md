@@ -25,8 +25,9 @@ stays normative for rule/state semantics).
   anything).
 - **Executable reference spec** — the TypeScript Watcher Engine in `apps/watcher/src/engine/`
   (rule pipeline, state-transition allow-list, batch IDs, missing-SLA sweep) plus its vitest
-  suite. The C# plugin port must match its decisions case-for-case (parity matrix planned at
-  `docs/superpowers/specs/parity/engine-test-parity.md`). **Frozen: keep tests green, no new
+  suite. The C# plugin port must match its decisions case-for-case (parity matrix:
+  `docs/superpowers/specs/parity/engine-test-parity.md`; module-by-module port plan:
+  `docs/superpowers/plans/2026-07-17-ts-to-d365-code-migration.md`). **Frozen: keep tests green, no new
   features.** If a spec ambiguity is found, fix TS + spec together, then port.
 - **Reference-only code** — folder adapter and scheduler `runOnce` (superseded by Power
   Automate flows), Postgres repositories/migrations (superseded by Dataverse tables).

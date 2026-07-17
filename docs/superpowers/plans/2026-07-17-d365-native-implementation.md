@@ -47,7 +47,7 @@
 ### Task 2: Engine port + parity tests (P2)
 
 **Parity artifacts in THIS repo:**
-- [ ] Create `docs/superpowers/specs/parity/engine-test-parity.md`: one row per vitest case across `duplicate.rule.test.ts`, `stuck-file.rule.test.ts`, `stability.rule.test.ts`, `state-transition.policy.test.ts`, `watcher-engine.test.ts`, `missing-sla-sweep.test.ts`, `batch-id.generator.test.ts` → planned FakeXrmEasy test method name.
+- [x] Create `docs/superpowers/specs/parity/engine-test-parity.md`: one row per vitest case → planned FakeXrmEasy test method name (36 behavioral cases; done 2026-07-17). Module-level port detail lives in [`2026-07-17-ts-to-d365-code-migration.md`](2026-07-17-ts-to-d365-code-migration.md).
 - [ ] (Recommended) Export shared JSON test vectors (inputs → expected outcome) from the vitest suite so both harnesses consume one source of truth.
 
 **C# artifacts (client environment):**

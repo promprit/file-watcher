@@ -1,0 +1,100 @@
+# TypeScript → D365 Code Migration Plan (module-by-module)
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Note:** all C#/Dataverse/flow tasks execute in the client's D365 environment; only the parity matrix updates live in this repo.
+
+**Goal:** Port every piece of existing TypeScript code to its Dynamics 365 counterpart (Dataverse tables, C# plugin classes, Power Automate flows), with behavior proven identical via the parity matrix.
+
+**Source spec:** [`docs/superpowers/specs/2026-07-17-d365-native-architecture-design.md`](../specs/2026-07-17-d365-native-architecture-design.md)
+**Parity matrix:** [`docs/superpowers/specs/parity/engine-test-parity.md`](../specs/parity/engine-test-parity.md)
+**Phasing:** this is the code-level detail behind Tasks 1–4 of [`2026-07-17-d365-native-implementation.md`](2026-07-17-d365-native-implementation.md).
+
+## Global Constraints
+
+- The TS code is the behavioral truth. Port semantics case-for-case; on any ambiguity, fix TS + spec together first, then port.
+- C# project layout: `FileWatcherMonitoring.Plugins` (engine + plugin + Custom APIs) and `FileWatcherMonitoring.Plugins.Tests` (FakeXrmEasy). No business logic in flows — flows only observe and normalize.
+- All time-dependent logic takes `IClock` (never `DateTime.UtcNow` inline) — the port of `packages/testing/fake-clock.ts`.
+- Enum values, status names, and error semantics keep their exact TS names (`FILE_DETECTED`, …) as Dataverse choice labels and C# enum members.
+
+---
+
+### Task 1: Contracts → C# types + Dataverse schema
+
+Source: `packages/contracts/src/**`
+
+| TS | D365 |
+|---|---|
+| `observations/file-observation.ts` `FileObservation` | C# record `FileObservation(string InterfaceId, string FilePath, long Size, DateTime Modified, DateTime ObservedAt)` + table `fwm_fileobservation` |
+| `events/file-event.ts` `FileEvent` | C# record `FileEvent` + table `fwm_fileevent` (EventId alternate key) |
+| `config/interface-config.ts` `InterfaceConfig` | C# record `InterfaceConfig` hydrated from `fwm_interface` row; includes real `StuckThresholdSeconds`/SLA fields (retires the `EngineDefaults` merge workaround) |
+| `config/connection-config.ts` `ConnectionConfig` | `fwm_connection` row; only flows read it — the engine never sees connection data |
+| `errors/error-codes.ts` (`InvalidStateTransitionError`, `InterfaceMismatchError`, `AdapterError`) | `InvalidStateTransitionException`, `InterfaceMismatchException` (both surfaced as `InvalidPluginExecutionException` at the plugin boundary); `AdapterError` has no C# port — adapter failures are flow-run failures (Task 5) |
+
+- [ ] Define C# records + enums (`FileStatus`) in `FileWatcherMonitoring.Plugins`
+- [ ] Verify Dataverse choice values match TS string constants 1:1
+
+### Task 2: Engine core → C# classes (the parity-matrix surface)
+
+Source → target, signatures preserved:
+
+| TS module | C# class / method |
+|---|---|
+| `engine/state-transition.policy.ts` `assertValidTransition(from, to)` | `StateTransitionPolicy.AssertValidTransition(FileStatus? from, FileStatus to)` — same allow-list, throws `InvalidStateTransitionException` |
+| `engine/rules/rule.ts` `Rule` type | `interface IRule { FileStatus? Evaluate(FileObservation obs, WatcherState? state, InterfaceConfig cfg, DateTime now); }` |
+| `engine/rules/duplicate.rule.ts` | `DuplicateRule` |
+| `engine/rules/stuck-file.rule.ts` | `StuckFileRule` |
+| `engine/rules/stability.rule.ts` | `StabilityRule` |
+| `engine/batch-id.generator.ts` `generateBatchId()` | `BatchIdGenerator.NewBatchId()` (`Guid.NewGuid()`) |
+| `engine/event-builder.ts` `buildFileEvent(...)` | `EventBuilder.Build(obs, status, batchId, IClock)` — fresh EventId per call |
+| `engine/interface-matcher.ts` `assertInterfaceMatch(...)` | `InterfaceMatcher.AssertMatch(obs, cfg)` |
+| `engine/watcher-engine.ts` `processObservation(obs, cfg, stateRepo)` | `WatcherEngine.ProcessObservation(obs, cfg, IStateRepository, IClock)` — pipeline order duplicate → stuck → stability, first non-null wins; implicit FILE_DETECTED for new files; null (no event) on no meaningful change |
+| `engine/missing-sla-sweep.ts` `checkMissingSla(cfg, stateRepo, now)` | `MissingSlaSweep.CheckMissingSla(cfg, IStateRepository, DateTime now)` — `__sla_window__` sentinel-row idempotency unchanged |
+| `packages/testing/fake-clock.ts` | `IClock` + `FakeClock` in the test project |
+
+- [ ] Port each class with its FakeXrmEasy test class **test-first**, per the parity matrix
+- [ ] Tick each matrix row ⬜→✅ in this repo as its C# test goes green (keep the matrix the single source of progress)
+
+### Task 3: State persistence → Dataverse repository
+
+Source: `engine/state/state-repository.ts` (interface), `engine/state/in-memory-state-repository.ts`, `database/repositories/state.repository.ts`, `database/client.ts`, `database/migrations/*`
+
+- [ ] `interface IStateRepository { WatcherState? Get(string interfaceId, string filePath); void Save(WatcherState state); IReadOnlyList<WatcherState> FindByInterface(string interfaceId); }` — same contract as TS
+- [ ] `DataverseStateRepository` against `IOrganizationService`: upsert via the (interface, file path) **alternate key** (replaces Postgres `ON CONFLICT DO UPDATE`); runs inside the plugin transaction, so state save + event insert commit atomically
+- [ ] No migration-framework port: table definitions live in the solution; `client.ts` pooling has no equivalent (platform-managed)
+- [ ] Postgres repos (`interface-config.repository.ts`, `connection-config.repository.ts`) are not ported as classes — the plugin reads the `fwm_interface` row via the observation's lookup; flows query `fwm_interface`/`fwm_connection` directly
+
+### Task 4: Plugin + Custom APIs (the new entry points)
+
+Source: the composition previously done by `scheduler/scheduler.ts` + `demo/engine-demo.ts` wiring
+
+- [ ] `FileObservationCreatePlugin`: synchronous, PostOperation on `fwm_fileobservation` Create — hydrates `InterfaceConfig`, calls `WatcherEngine.ProcessObservation`, saves state + inserts `fwm_fileevent` in-transaction, throws on invalid transition (fail-fast; per-observation isolation is free since each create is its own pipeline)
+- [ ] Custom API `fwm_ProcessObservation` (same logic, callable for reprocessing/tests)
+- [ ] Custom API `fwm_CheckMissingSla` (pages per interface — 2-min plugin budget)
+- [ ] `demo/engine-demo.ts` → a documented manual smoke script: create observation row → verify state + event rows
+
+### Task 5: Adapters + scheduler → Power Automate flows (behavior checklist)
+
+Source: `adapters/adapter.ts`, `adapters/folder/folder.adapter.ts`, `scheduler/scheduler.ts`
+
+No C# port — each TS-tested behavior becomes a flow requirement, verified manually E2E:
+
+- [ ] Pattern filter: only files matching `fwm_filepattern` produce observations (folder.adapter: "returns only files matching the pattern")
+- [ ] Directories are never observations, even if name matches ("ignores subdirectories")
+- [ ] Observation carries path, name, size, source modified time ("returns correct size, mtime, path, interfaceId")
+- [ ] `fwm_inboundpath` resolved under the connection endpoint ("resolves inboundPath as a subdirectory")
+- [ ] Empty listing → zero observations, no error ("returns an empty array")
+- [ ] Invalid pattern / missing directory → flow run fails visibly (replaces `AdapterError`) and alerts the owner; other interfaces unaffected (scheduler's per-interface isolation → per-flow isolation + configure-run-after)
+- [ ] File vanishing mid-listing is skipped, not fatal ("skips a file that no longer exists")
+- [ ] Recurrence honors `fwm_pollintervalseconds` (1-min floor); flow concurrency = 1 (replaces `runOnce` overlap lock)
+- [ ] One watch flow per connection: SFTP-SSH, Azure Blob, SharePoint, File System (+ gateway); sweep flow calls `fwm_CheckMissingSla`
+
+### Task 6: Retire / freeze the TS side (this repo)
+
+- [ ] Nothing deleted beyond the already-removed gateway stubs: engine + tests stay frozen (reference spec), adapters/scheduler/database stay reference-only
+- [ ] When P2 completes: update the parity matrix statuses and add the C# repo/pipeline location to CLAUDE.md
+
+## Verification (whole plan)
+
+1. Parity matrix 100% ✅ (36 behavioral cases) with the TS suite still green here (`npm test` — 81 tests).
+2. E2E in dev per source type: new file → FILE_DETECTED → FILE_STABLE; re-drop → FILE_DUPLICATE; growing file past threshold → FILE_STUCK; missed window → exactly one FILE_MISSING_BY_SLA (sentinel verified by a second sweep).
+3. Task 5 checklist walked through against each deployed flow.
+4. Invalid transition attempt (e.g. hand-crafted observation against a FILE_DUPLICATE state) fails the plugin with `InvalidPluginExecutionException` and rolls back — no state or event row written.
