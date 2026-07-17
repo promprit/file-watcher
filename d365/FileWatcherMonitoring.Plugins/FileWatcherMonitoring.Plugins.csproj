@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>FileWatcherMonitoring.Plugins</RootNamespace>
+    <!-- Dataverse plugin assemblies must be strong-named and target netstandard2.0 /
+         .NET Framework 4.6.2. Signing key + Microsoft.CrmSdk / PowerPlatform.Dataverse
+         package references are added in the client environment when the plugin
+         wrapper (IPlugin) is created — the engine core here has zero dependencies. -->
+  </PropertyGroup>
+
+</Project>

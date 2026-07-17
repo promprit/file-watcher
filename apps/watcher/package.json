@@ -7,11 +7,12 @@
     "migrate:create": "node-pg-migrate create --migrations-dir src/database/migrations",
     "test:integration": "vitest run",
     "test:integration:watch": "vitest",
-    "demo": "vite-node src/demo/engine-demo.ts"
+    "demo": "vite-node src/demo/engine-demo.ts",
+    "parity:vectors": "vite-node src/parity/generate-vectors.ts"
   },
   "dependencies": {
-    "pg": "^8.11.0",
-    "@packages/contracts": "*"
+    "@packages/contracts": "*",
+    "pg": "^8.11.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

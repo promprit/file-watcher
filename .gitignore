@@ -15,3 +15,7 @@ dist/
 
 # OS
 .DS_Store
+
+# .NET (d365 C# port)
+d365/**/bin/
+d365/**/obj/

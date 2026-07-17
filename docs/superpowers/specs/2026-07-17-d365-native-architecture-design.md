@@ -153,8 +153,14 @@ observation row is an independent plugin invocation.
 | FILE_STUCK | FILE_DUPLICATE | no |
 | FILE_DUPLICATE | anything | no — terminal |
 | (none) | FILE_MISSING_BY_SLA | yes (via sweep) |
+| FILE_MISSING_BY_SLA | FILE_MISSING_BY_SLA | yes — sentinel re-emits on a later day |
 
 Allow-list, not deny-list: anything not in the table is invalid.
+
+> Note: the last row was implicit in the original engine spec's table but explicit in the
+> reference implementation (`VALID_TRANSITIONS` in `state-transition.policy.ts`) — it is what
+> lets the sweep's sentinel row emit again on a later missed day. Surfaced while generating
+> the parity test vectors; recorded here so the C# port carries it.
 
 ## Adapters (Power Automate flows)
 

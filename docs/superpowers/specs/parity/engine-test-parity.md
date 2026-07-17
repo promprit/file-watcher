@@ -1,7 +1,11 @@
 # Engine Test Parity Matrix — vitest ↔ FakeXrmEasy
 
 **Date:** 2026-07-17
-**Status:** Matrix defined; C# side pending (P2 of the D365-native plan)
+**Status:** Matrix defined; **shared test vectors generated and verified** against the TS
+engine (`engine-test-vectors.json`, regenerate with `npm run parity:vectors -w @apps/watcher`);
+**C# port + data-driven xunit suite written** under `d365/` — awaiting first `dotnet test` run
+in the client environment (no .NET SDK available in this repo's sandbox), after which the
+rows below get ticked.
 **Related:** [2026-07-17-d365-native-architecture-design.md](../2026-07-17-d365-native-architecture-design.md),
 [plans/2026-07-17-ts-to-d365-code-migration.md](../../plans/2026-07-17-ts-to-d365-code-migration.md)
 
@@ -29,6 +33,7 @@ file, `MethodName_Condition_Expectation` naming, FakeXrmEasy for Dataverse fakes
 | rejects FILE_STUCK → FILE_DUPLICATE | `Rejects_FileStuck_To_FileDuplicate` | ⬜ |
 | rejects FILE_DETECTED → FILE_MISSING_BY_SLA | `Rejects_FileDetected_To_FileMissingBySla` | ⬜ |
 | rejects null → FILE_STABLE | `Rejects_Null_To_FileStable` | ⬜ |
+| *(implicit in TS table, explicit in code)* allows FILE_MISSING_BY_SLA → FILE_MISSING_BY_SLA | `Allows_FileMissingBySla_To_FileMissingBySla` (12th policy vector) | ⬜ |
 
 ## rules/duplicate.rule.test.ts → `DuplicateRuleTests`
 
