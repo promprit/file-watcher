@@ -25,7 +25,13 @@ flowchart TB
             P2["CheckMissingSlaPlugin<br/>absence sweep, sentinel row"]
         end
         APP["Model-driven app<br/>dashboards, event views, config forms"]
+        subgraph API["API entry points (self-reporting)"]
+            RP["fwm_ReportApiMessage<br/>Received / Processed / Failed"]
+            AM[("fwm_apimessage +<br/>fwm_apievent")]
+        end
     end
+    SRC["API integrations /<br/>F&O business events"] -->|Custom API call| RP
+    RP --> AM
 
     N["Teams / Email<br/>alert owners"]
 
@@ -68,7 +74,7 @@ on the Dataverse side — F&O needs zero changes, no X++. Events are visible to 
 linked Dataverse, or optionally copied into an F&O data entity with one extra flow step
 (standard Fin & Ops connector).
 
-## The five tables
+## The seven tables
 
 1. **`fwm_connection`** — where files live (SFTP host, Blob account, SharePoint site).
    Metadata only. Credentials are never stored in any table — they live in Power Automate
@@ -83,6 +89,10 @@ linked Dataverse, or optionally copied into an F&O data entity with one extra fl
    (interface id, file path).
 5. **`fwm_fileevent`** — append-only audit trail. Every meaningful status change is one row,
    written in the same transaction as the state change.
+6. **`fwm_apimessage`** — API entry-point message state (self-reported — see the "second
+   rule pack" section below). A message has identity, so it is its own state row;
+   `__heartbeat__` is the feed-SLA sentinel.
+7. **`fwm_apievent`** — append-only audit trail for API message lifecycle events.
 
 ## Runtime walkthrough
 
@@ -169,6 +179,8 @@ relocating the logic rather than cutting features.
 - Test vectors are generated **by executing** that reference
   (`npm run parity:vectors -w @apps/watcher`); the C# engine must pass all 43 vector-driven
   parity tests (`d365/FileWatcherMonitoring.Plugins.Tests`).
-- The Dataverse layer (repository upsert, plugin path, sweep) has 12 further tests against a
-  fake `IOrganizationService` (`d365/FileWatcherMonitoring.Dataverse.Tests`).
-- CI runs all three suites plus a vector-drift check on every push.
+- The Dataverse layer (repository upsert, plugin path, both sweeps, the API rule pack's
+  transition policy/report handling) has 38 further tests against a fake
+  `IOrganizationService` (`d365/FileWatcherMonitoring.Dataverse.Tests`).
+- 8 python drift guards machine-check the provisioning script against `Schema.cs`.
+- CI runs all suites plus a vector-drift check on every push — **170 checks total**.

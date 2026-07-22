@@ -5,14 +5,15 @@ FileWatcherMonitoring — one-shot Dataverse provisioning (plug & play).
 Creates everything the D365-native file watcher needs in a target environment,
 idempotently (safe to re-run; existing pieces are skipped):
 
-  1. Global choice  fwm_filestatus   (values fixed: 100000000..100000004 — must
-     match d365/FileWatcherMonitoring.Dataverse/Schema.cs)
-  2. Tables         fwm_interface, fwm_connection, fwm_filestate,
-                    fwm_fileobservation, fwm_fileevent (+ all columns)
-  3. Alternate keys fwm_filestate(interfaceid,filepath), fwm_fileevent(eventid)
+  1. Global choices fwm_filestatus, fwm_apistatus, fwm_interfacetype (values fixed —
+     must match d365/FileWatcherMonitoring.Dataverse/Schema.cs)
+  2. Tables         fwm_interface, fwm_connection, fwm_filestate, fwm_fileobservation,
+                    fwm_fileevent, fwm_apimessage, fwm_apievent (+ all columns)
+  3. Alternate keys filestate(interfaceid,filepath), fileevent(eventid),
+                    apimessage(interfaceid,messageid), apievent(eventid)
   4. Plugin assembly upload (signed FileWatcherMonitoring.Dataverse.dll)
   5. Plugin step    sync PostOperation on Create of fwm_fileobservation
-  6. Custom API     fwm_CheckMissingSla (InterfaceId:String in, EventCount:Integer out)
+  6. Custom APIs    fwm_CheckMissingSla, fwm_ReportApiMessage, fwm_CheckApiSla
 
 Usage:
   # token via Azure CLI (resource = your environment URL):

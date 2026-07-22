@@ -24,7 +24,7 @@ minute a feed is stuck, failed, or silent.
 |---|---|---|
 | `d365/FileWatcherMonitoring.Plugins/` | C# engine core (rules, transition allow-list, sweep) | **Production source** — deployed as plugin |
 | `d365/FileWatcherMonitoring.Dataverse/` | Plugin wrappers, `DataverseStateRepository`, Custom API | **Production source** — signed self-contained DLL |
-| `d365/FileWatcherMonitoring.*.Tests/` | 43 parity tests + 12 plugin-layer tests | CI |
+| `d365/FileWatcherMonitoring.*.Tests/` | 43 parity tests + 38 plugin/API-layer tests | CI |
 | `d365/deploy/provision.py` | One-shot idempotent environment provisioning (tables, choice, keys, plugin, Custom API) | CI-adjacent tooling |
 | `apps/watcher/src/engine/` | **Frozen TypeScript reference engine** + 81 tests — the executable spec the C# port must match | Reference only, no new features |
 | `apps/watcher/src/parity/` | Generates shared test vectors by executing the reference engine | Tooling |
@@ -38,7 +38,7 @@ minute a feed is stuck, failed, or silent.
 npm install && npm test                                     # 81 TS reference tests
 npm run parity:vectors -w @apps/watcher                     # regenerate shared vectors (idempotent)
 dotnet test d365/FileWatcherMonitoring.Plugins.Tests        # 43 vector-driven parity tests
-dotnet test d365/FileWatcherMonitoring.Dataverse.Tests      # 12 plugin-layer tests (fake IOrganizationService)
+dotnet test d365/FileWatcherMonitoring.Dataverse.Tests      # 38 plugin + API-layer tests (fake IOrganizationService)
 dotnet build d365/FileWatcherMonitoring.Dataverse -c Release # the deployable plugin DLL
 ```
 

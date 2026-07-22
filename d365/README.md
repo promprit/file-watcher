@@ -23,8 +23,8 @@ C# port of the frozen TypeScript Watcher Engine (`apps/watcher/src/engine/`), pe
   built **self-contained**: the engine sources compile directly into this one DLL,
   as classic plugin registration requires.
 - `deploy/` — **plug & play**: `provision.py` (stdlib-only Python, idempotent)
-  creates the global choice, all 5 tables/columns/alternate keys, uploads the
-  plugin assembly, registers the sync step, and creates the Custom API against any
+  creates the 3 global choices, all 7 tables/columns/alternate keys, uploads the
+  plugin assembly, registers the sync step, and creates the 3 Custom APIs against any
   environment via the Web API. `--dry-run` prints the full plan without HTTP;
   `--seed seed.example.json` loads sample config rows; `smoke.py` is the automated
   post-provisioning acceptance test (observation → FILE_DETECTED → FILE_STABLE,
@@ -52,7 +52,8 @@ together, `npm run parity:vectors -w @apps/watcher`, then re-run both suites.
 
 - `FileWatcherMonitoring.Plugins.Tests` — engine semantics: 43 vector-driven cases proving
   the C# engine identical to the TS reference.
-- `FileWatcherMonitoring.Dataverse.Tests` — plugin layer: 12 cases running
+- `FileWatcherMonitoring.Dataverse.Tests` — plugin + API layer: 38 cases running the
+  API rule pack (transition policy, self-reporting, timeout/heartbeat sweeps) and
   `DataverseStateRepository` / `ObservationProcessor` / `SweepProcessor` against a
   hand-rolled in-memory `FakeOrganizationService` (alternate-key upsert emulated;
   net8 via the `Microsoft.PowerPlatform.Dataverse.Client` build of `Microsoft.Xrm.Sdk`,

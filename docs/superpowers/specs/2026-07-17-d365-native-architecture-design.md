@@ -1,5 +1,11 @@
 # D365-Native Architecture (Dataverse + Power Platform + F&O) — Design Spec
 
+> **Extended (2026-07-22):** API entry-point monitoring (self-reporting integrations,
+> `fwm_apimessage`/`fwm_apievent`, Custom APIs `fwm_ReportApiMessage`/`fwm_CheckApiSla`)
+> is specified in
+> [2026-07-22-api-entrypoint-monitoring-design.md](2026-07-22-api-entrypoint-monitoring-design.md).
+> This spec remains normative for the base architecture and the file rule pack.
+
 **Date:** 2026-07-17
 **Status:** Approved
 **Related:** [docs/monorepo-architecture.md](../../monorepo-architecture.md) (superseded by this spec),

@@ -47,7 +47,7 @@ python3 d365/deploy/provision.py \
 ```
 
 Creates: `fwm_filestatus` global choice (values 100000000–100000004, matching
-`Schema.cs`), the 5 tables with all columns, the alternate keys
+`Schema.cs`), the 7 tables with all columns, the alternate keys
 (`fwm_filestate` interfaceid+filepath, `fwm_fileevent` eventid), the plugin
 assembly + sync PostOperation step on `fwm_fileobservation` Create, and Custom API
 `fwm_CheckMissingSla`. Existing pieces are skipped, so re-running after a partial
@@ -82,7 +82,7 @@ full dry-run.
 
 - Flows: follow [`docs/superpowers/plans/2026-07-17-flow-runbook.md`](../../docs/superpowers/plans/2026-07-17-flow-runbook.md)
   (watch flow per connection, SLA sweep calling `fwm_CheckMissingSla`, alert flow).
-- Add the 5 tables + flows to a solution named `FileWatcherMonitoring` for ALM.
+- Add the 7 tables + flows to a solution named `FileWatcherMonitoring` for ALM.
 - Model-driven app over interface/connection/state/event tables; security roles
   (`FWM Integration Admin` maintain-setup, `FWM Integration Operator` monitor).
 - Bulk-delete job for `fwm_fileobservation` rows older than 7 days.

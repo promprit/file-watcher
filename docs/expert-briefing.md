@@ -121,7 +121,17 @@ Alert flow ──(on fwm_fileevent create: STUCK/MISSING)── Teams/Email
 Model-driven app ──(views/dashboards/forms over all tables)
 ```
 
-Footprint: **5 tables, 2 plugins, 1 custom API, 3 flows, 1 app**. All inside the F&O
+Plus the API entry-point path (self-reporting, no polling):
+
+```
+API integrations / F&O business events ──(Custom API fwm_ReportApiMessage:
+    Received | Processed | Failed)── ReportApiMessagePlugin
+                                       ├─ upsert fwm_apimessage   [message = its own state]
+                                       └─ insert fwm_apievent     [append-only audit]
+Sweep flow ──(fwm_CheckApiSla)── timeouts + feed heartbeat (FEED_MISSING_BY_SLA)
+```
+
+Footprint: **7 tables, 4 plugins, 3 custom APIs, 3–4 flows, 1 app**. All inside the F&O
 environment's linked Dataverse (`*.crm.dynamics.com` — F&O itself, `*.operations.dynamics.com`,
 needs zero changes).
 
@@ -172,20 +182,28 @@ today's UTC deadline ∧ no non-sentinel state first-detected today → write on
 "same UTC day" check makes re-runs idempotent; the allow-list explicitly permits
 `FILE_MISSING_BY_SLA → FILE_MISSING_BY_SLA` so the next missed day fires again.
 
-### 3.5 Real-time API (two claims, keep them separate)
+### 3.5 API entry points — covered (the second rule pack)
 
-1. **The intake is already a real-time API.** The plugin fires on any observation
-   create, regardless of caller. `POST /api/data/v9.2/fwm_fileobservations` from any
-   system → engine runs synchronously in that request, sub-second, transactional.
-   Polling flows exist only for passive sources (SFTP can't push). Push-capable sources
-   (webhooks, F&O business events) can skip polling entirely. `smoke.py` exercises
-   exactly this path — no flows involved.
-2. **Monitoring API-based integrations (non-file) is an extension, not current scope.**
-   The skeleton (intake → sync engine → snapshot + audit → alerts → app) and the SLA
-   sweep transfer as-is; the file-specific rules (stability-by-size, stuck-by-growth,
-   duplicate-by-path) would be replaced by message-timeout/error-rate/heartbeat rules.
-   Days of work, because the hard parts (transactionality, test harness, provisioning,
-   parity discipline) already exist.
+Both interface entry-point types are monitored on one engine:
+
+1. **Files are watched** — they can't announce themselves, so flows poll and write
+   observations. (And the observation intake is itself a real-time API: any push-capable
+   source can `POST fwm_fileobservations` directly and skip polling — sub-second,
+   transactional. `smoke.py` exercises exactly this path.)
+2. **APIs self-report** — they already touch D365 when they run, so the integration (or
+   an F&O business-event flow) calls Custom API **`fwm_ReportApiMessage`** with
+   `Received` / `Processed` / `Failed`. Message state + audit event commit in one
+   transaction. Statuses: `MSG_RECEIVED`, `MSG_PROCESSED`, `MSG_DUPLICATE`,
+   `MSG_FAILED` (error code recorded), `MSG_TIMEOUT`. A sweep (**`fwm_CheckApiSla`**)
+   adds what self-reporting can't: timeouts (received, never processed) and the feed
+   heartbeat (`FEED_MISSING_BY_SLA` — feed silent past its deadline, sentinel-idempotent
+   per UTC day). Late completion after a timeout is recordable — the allow-list permits
+   `MSG_TIMEOUT → MSG_PROCESSED`.
+
+One-liner: *files are watched because they can't speak; APIs report because they can.*
+Spec: `docs/superpowers/specs/2026-07-22-api-entrypoint-monitoring-design.md`.
+Out of scope on the API side: payload inspection, retry orchestration, and synchronous
+CRUD calls that already fail loudly to their caller.
 
 ### 3.6 Correctness chain (how we prove the logic)
 
@@ -195,17 +213,18 @@ today's UTC deadline ∧ no non-sentinel state first-detected today → write on
    scenarios and records ground-truth outcomes to JSON. Self-verifying — generation
    fails if execution ever disagrees with declared expectations.
 3. **Parity suite:** 43 vector-driven xunit tests prove the C# engine decision-identical.
-4. **Plugin layer:** 12 tests run repository/processors against a fake
-   `IOrganizationService` (alternate-key upsert emulated; unsupported SDK calls throw so
-   new code paths fail loudly).
-5. **Tooling guards:** 6 python tests regex-parse `Schema.cs` and diff it against the
-   provisioning script — choice values, every column, key byte budgets — plus a full
-   dry-run execution.
+4. **Plugin + API layer:** 38 tests run the repositories, processors, API transition
+   policy, report handling, and both sweeps against a fake `IOrganizationService`
+   (alternate-key upsert emulated; unsupported SDK calls throw so new code paths fail
+   loudly).
+5. **Tooling guards:** 8 python tests regex-parse `Schema.cs` and diff it against the
+   provisioning script — all three choice sets' values, every column, key byte budgets —
+   plus a full dry-run execution.
 6. **CI:** all of the above + vector-drift check on every push.
 7. **In-environment:** `smoke.py` = automated acceptance (detect → stable, same batch)
    with exit-code verdict.
 
-**142 automated checks total. The slide number: 81 + 43 + 12 + 6.**
+**170 automated checks total. The slide number: 81 + 43 + 38 + 8.**
 
 ### 3.7 Deployment story
 
@@ -286,8 +305,9 @@ deployment, firewall changes, database servers.
 
 | | |
 |---|---|
-| Footprint | 5 tables · 2 plugins · 1 custom API · 3 flows · 1 app |
-| Tests | **142** (81 reference + 43 parity + 12 plugin layer + 6 tooling), all in CI |
+| Footprint | 7 tables · 4 plugins · 3 custom APIs · 3–4 flows · 1 app |
+| Tests | **170** (81 reference + 43 parity + 38 plugin/API layer + 8 tooling), all in CI |
+| Coverage | Both entry-point types: files (watched) + APIs (self-reporting) |
 | Provisioning | ~5 min, one idempotent script, dry-run preview |
 | Detection latency | ≤ poll interval (min 1 min); sub-second via direct API push |
 | Net-new cost | ~$15/mo licensing; $0 infrastructure |
