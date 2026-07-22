@@ -26,6 +26,7 @@
     <Compile Include="../FileWatcherMonitoring.Dataverse/Schema.cs" Link="Dataverse/Schema.cs" />
     <Compile Include="../FileWatcherMonitoring.Dataverse/DataverseStateRepository.cs" Link="Dataverse/DataverseStateRepository.cs" />
     <Compile Include="../FileWatcherMonitoring.Dataverse/Processors.cs" Link="Dataverse/Processors.cs" />
+    <Compile Include="../FileWatcherMonitoring.Dataverse/ApiProcessors.cs" Link="Dataverse/ApiProcessors.cs" />
   </ItemGroup>
 
 </Project>

@@ -19,7 +19,7 @@ Phase 0, then execute phases in order. Every phase has an exit test.
 | File monitoring — engine, tables, plugins, Custom API | ✅ Code-complete, 142 tests green, signed DLL |
 | File monitoring — provisioning + smoke automation | ✅ `provision.py` (dry-run/seed) + `smoke.py` |
 | File monitoring — flows, app, roles | 📋 Specs written, needs environment (clicking only) |
-| API-based integration monitoring | ❌ Not built — designed in Phase 4 of this plan |
+| API-based integration monitoring | ✅ **Code-complete 2026-07-22** (spec: [2026-07-22-api-entrypoint-monitoring-design.md](../specs/2026-07-22-api-entrypoint-monitoring-design.md); 26 tests green; provision.py extended) — Phase 4c deployment pending env |
 | Environment access | ❌ **The blocker — Phase 0** |
 
 ---

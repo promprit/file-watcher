@@ -47,10 +47,54 @@ STATUS_OPTIONS = [
     ("FILE_MISSING_BY_SLA", 100000004),
 ]
 
+# Must match Schema.cs exactly.
+API_STATUS_OPTIONS = [
+    ("MSG_RECEIVED", 100000000),
+    ("MSG_PROCESSED", 100000001),
+    ("MSG_DUPLICATE", 100000002),
+    ("MSG_FAILED", 100000003),
+    ("MSG_TIMEOUT", 100000004),
+    ("FEED_MISSING_BY_SLA", 100000005),
+]
+
+INTERFACE_TYPE_OPTIONS = [
+    ("File", 100000000),
+    ("Api", 100000001),
+]
+
 ASSEMBLY_NAME = "FileWatcherMonitoring.Dataverse"
 PLUGIN_TYPE_OBSERVATION = "FileWatcherMonitoring.Dataverse.FileObservationCreatePlugin"
 PLUGIN_TYPE_SWEEP = "FileWatcherMonitoring.Dataverse.CheckMissingSlaPlugin"
-CUSTOM_API_NAME = "fwm_CheckMissingSla"
+PLUGIN_TYPE_API_REPORT = "FileWatcherMonitoring.Dataverse.ReportApiMessagePlugin"
+PLUGIN_TYPE_API_SLA = "FileWatcherMonitoring.Dataverse.CheckApiSlaPlugin"
+PLUGIN_TYPES = [PLUGIN_TYPE_OBSERVATION, PLUGIN_TYPE_SWEEP, PLUGIN_TYPE_API_REPORT, PLUGIN_TYPE_API_SLA]
+
+# uniquename -> (display, description, plugin type, request params, response props)
+# param/prop: (uniquename, display, type[10=String 7=Integer], optional)
+CUSTOM_APIS = {
+    "fwm_CheckMissingSla": (
+        "FWM Check Missing SLA", "Absence-driven missing-file sweep for one interface.",
+        PLUGIN_TYPE_SWEEP,
+        [("InterfaceId", "Interface Id", 10, False)],
+        [("EventCount", "Event Count", 7)],
+    ),
+    "fwm_ReportApiMessage": (
+        "FWM Report API Message", "API integrations self-report Received/Processed/Failed here.",
+        PLUGIN_TYPE_API_REPORT,
+        [("InterfaceId", "Interface Id", 10, False),
+         ("MessageId", "Message Id", 10, False),
+         ("Action", "Action (Received|Processed|Failed)", 10, False),
+         ("CorrelationId", "Correlation Id", 10, True),
+         ("ErrorCode", "Error Code", 10, True)],
+        [("Status", "Recorded Status", 10)],
+    ),
+    "fwm_CheckApiSla": (
+        "FWM Check API SLA", "Timeout sweep + feed heartbeat for one API interface.",
+        PLUGIN_TYPE_API_SLA,
+        [("InterfaceId", "Interface Id", 10, False)],
+        [("EventCount", "Event Count", 7)],
+    ),
+}
 
 
 class Client:
@@ -106,15 +150,18 @@ class DryRunClient:
 
     def __init__(self):
         self.calls = []
+        self.posted_choices = set()
 
     def call(self, method, path, body=None, ok404=False):
         if method != "GET":
             self.calls.append((method, path))
+            if path == "GlobalOptionSetDefinitions" and body:
+                self.posted_choices.add(body.get("Name"))
             print(f"    DRY-RUN {method} {path}" + (f"  ({len(json.dumps(body))} bytes)" if body else ""))
         if method == "GET":
             if path.startswith("GlobalOptionSetDefinitions"):
-                posted = any(m == "POST" and p.startswith("GlobalOptionSetDefinitions") for m, p in self.calls)
-                if ok404 and not posted:
+                name = path.split("Name='")[-1].rstrip("')")
+                if ok404 and name not in self.posted_choices:
                     return 404, None
                 return 200, dict(self._SYNTHETIC_ROW)
             if path.startswith(self._PLATFORM):
@@ -216,8 +263,9 @@ TABLES = [
             int_attr("fwm_stuckthresholdseconds", "Stuck Threshold (s)"),
             string_attr("fwm_sladeadline", "SLA Deadline (HH:mm UTC)", 20),
             bool_attr("fwm_enabled", "Enabled"),
+            int_attr("fwm_processingtimeoutseconds", "Processing Timeout (s, API)"),
         ],
-        "picklists": [],
+        "picklists": [("fwm_interfacetype", "Interface Type", False, "fwm_interfacetype")],
         "keys": [],
     },
     {
@@ -252,8 +300,8 @@ TABLES = [
             datetime_attr("fwm_lastseenat", "Last Seen At"),
         ],
         "picklists": [
-            ("fwm_currentstatus", "Current Status", True),
-            ("fwm_previousstatus", "Previous Status", False),
+            ("fwm_currentstatus", "Current Status", True, "fwm_filestatus"),
+            ("fwm_previousstatus", "Previous Status", False, "fwm_filestatus"),
         ],
         "keys": [("fwm_filestate_pathkey", "Interface + File Path", ["fwm_interfaceid", "fwm_filepath"])],
     },
@@ -284,34 +332,70 @@ TABLES = [
             string_attr("fwm_filepath", "File Path", 500),
             datetime_attr("fwm_occurredat", "Occurred At"),
         ],
-        "picklists": [("fwm_eventtype", "Event Type", True)],
+        "picklists": [("fwm_eventtype", "Event Type", True, "fwm_filestatus")],
         "keys": [("fwm_fileevent_eventidkey", "Event Id", ["fwm_eventid"])],
+    },
+    {
+        "schema": "fwm_apimessage",
+        "display": "FWM API Message",
+        "collection": "FWM API Messages",
+        "description": "API entry-point message state (self-reported via fwm_ReportApiMessage). Message rows are their own state; __heartbeat__ is the feed-SLA sentinel.",
+        "primary": string_attr("fwm_messageid", "Message Id", 100, required=True, primary=True),
+        "attrs": [
+            string_attr("fwm_interfaceid", "Interface Id", 50, required=True),
+            string_attr("fwm_correlationid", "Correlation Id", 100),
+            string_attr("fwm_batchid", "Batch Id", 100),
+            string_attr("fwm_errorcode", "Error Code", 100),
+            datetime_attr("fwm_receivedat", "Received At"),
+            datetime_attr("fwm_processedat", "Processed At"),
+            datetime_attr("fwm_statuschangedat", "Status Changed At"),
+        ],
+        "picklists": [
+            ("fwm_currentstatus", "Current Status", True, "fwm_apistatus"),
+            ("fwm_previousstatus", "Previous Status", False, "fwm_apistatus"),
+        ],
+        "keys": [("fwm_apimessage_msgkey", "Interface + Message Id", ["fwm_interfaceid", "fwm_messageid"])],
+    },
+    {
+        "schema": "fwm_apievent",
+        "display": "FWM API Event",
+        "collection": "FWM API Events",
+        "description": "Append-only audit trail of API message lifecycle events (written in the same transaction as the message state change).",
+        "primary": string_attr("fwm_eventid", "Event Id", 100, required=True, primary=True),
+        "attrs": [
+            string_attr("fwm_batchid", "Batch Id", 100),
+            string_attr("fwm_interfaceid", "Interface Id", 50),
+            string_attr("fwm_messageid", "Message Id", 100),
+            datetime_attr("fwm_occurredat", "Occurred At"),
+        ],
+        "picklists": [("fwm_eventtype", "Event Type", True, "fwm_apistatus")],
+        "keys": [("fwm_apievent_eventidkey", "Event Id", ["fwm_eventid"])],
     },
 ]
 
 
-def ensure_global_choice(client):
-    status, body = client.get(f"GlobalOptionSetDefinitions(Name='fwm_filestatus')", ok404=True)
+def ensure_global_choice(client, name, display, options):
+    status, body = client.get(f"GlobalOptionSetDefinitions(Name='{name}')", ok404=True)
     if status == 200:
-        print("  = global choice fwm_filestatus exists")
+        print(f"  = global choice {name} exists")
         return body["MetadataId"]
     payload = {
         "@odata.type": "Microsoft.Dynamics.CRM.OptionSetMetadata",
-        "Name": "fwm_filestatus",
-        "DisplayName": label("FWM File Status"),
+        "Name": name,
+        "DisplayName": label(display),
         "IsGlobal": True,
         "OptionSetType": "Picklist",
         "Options": [
-            {"Value": value, "Label": label(name)} for name, value in STATUS_OPTIONS
+            {"Value": value, "Label": label(option)} for option, value in options
         ],
     }
     client.post("GlobalOptionSetDefinitions", payload)
-    status, body = client.get(f"GlobalOptionSetDefinitions(Name='fwm_filestatus')")
-    print("  + created global choice fwm_filestatus")
+    status, body = client.get(f"GlobalOptionSetDefinitions(Name='{name}')")
+    print(f"  + created global choice {name}")
     return body["MetadataId"]
 
 
-def ensure_table(client, table, choice_id):
+def ensure_table(client, table, choice_ids):
     logical = table["schema"].lower()
     status, _ = client.get(f"EntityDefinitions(LogicalName='{logical}')", ok404=True)
     if status == 404:
@@ -334,13 +418,13 @@ def ensure_table(client, table, choice_id):
     for attr in table["attrs"]:
         ensure_attribute(client, logical, attr["SchemaName"].lower(), attr)
 
-    for schema, display, required in table["picklists"]:
+    for schema, display, required, choice_name in table["picklists"]:
         picklist = {
             "@odata.type": "Microsoft.Dynamics.CRM.PicklistAttributeMetadata",
             "SchemaName": schema,
             "RequiredLevel": {"Value": "ApplicationRequired" if required else "None"},
             "DisplayName": label(display),
-            "GlobalOptionSet@odata.bind": f"/GlobalOptionSetDefinitions({choice_id})",
+            "GlobalOptionSet@odata.bind": f"/GlobalOptionSetDefinitions({choice_ids[choice_name]})",
         }
         ensure_attribute(client, logical, schema.lower(), picklist)
 
@@ -406,7 +490,7 @@ def ensure_plugin(client, dll_path):
         print(f"  + uploaded assembly {ASSEMBLY_NAME}")
 
     type_ids = {}
-    for type_name in (PLUGIN_TYPE_OBSERVATION, PLUGIN_TYPE_SWEEP):
+    for type_name in PLUGIN_TYPES:
         _, body = client.get(f"plugintypes?$select=plugintypeid&$filter=typename eq '{type_name}'")
         rows = body.get("value", [])
         if rows:
@@ -459,48 +543,51 @@ def ensure_step(client, plugin_type_id):
     print(f"  + registered step '{step_name}' (sync PostOperation)")
 
 
-def ensure_custom_api(client, plugin_type_id):
-    _, body = client.get(f"customapis?$select=customapiid&$filter=uniquename eq '{CUSTOM_API_NAME}'")
+def ensure_custom_api(client, unique_name, definition, type_ids):
+    display, description, plugin_type, params, responses = definition
+    _, body = client.get(f"customapis?$select=customapiid&$filter=uniquename eq '{unique_name}'")
     if body.get("value"):
-        print(f"  = Custom API {CUSTOM_API_NAME}")
+        print(f"  = Custom API {unique_name}")
         return
     _, created = client.post(
         "customapis",
         {
-            "uniquename": CUSTOM_API_NAME,
-            "name": CUSTOM_API_NAME,
-            "displayname": "FWM Check Missing SLA",
-            "description": "Runs the absence-driven missing-SLA sweep for one interface.",
+            "uniquename": unique_name,
+            "name": unique_name,
+            "displayname": display,
+            "description": description,
             "bindingtype": 0,          # global
             "isfunction": False,
             "isprivate": False,
             "allowedcustomprocessingsteptype": 0,
-            "plugintypeid@odata.bind": f"/plugintypes({plugin_type_id})",
+            "plugintypeid@odata.bind": f"/plugintypes({type_ids[plugin_type]})",
         },
     )
     api_id = created["@id"].split("(")[-1].rstrip(")")
-    client.post(
-        "customapirequestparameters",
-        {
-            "uniquename": "InterfaceId",
-            "name": f"{CUSTOM_API_NAME}.InterfaceId",
-            "displayname": "Interface Id",
-            "type": 10,  # String
-            "isoptional": False,
-            "customapiid@odata.bind": f"/customapis({api_id})",
-        },
-    )
-    client.post(
-        "customapiresponseproperties",
-        {
-            "uniquename": "EventCount",
-            "name": f"{CUSTOM_API_NAME}.EventCount",
-            "displayname": "Event Count",
-            "type": 7,  # Integer
-            "customapiid@odata.bind": f"/customapis({api_id})",
-        },
-    )
-    print(f"  + created Custom API {CUSTOM_API_NAME} (InterfaceId → EventCount)")
+    for uniquename, param_display, type_code, optional in params:
+        client.post(
+            "customapirequestparameters",
+            {
+                "uniquename": uniquename,
+                "name": f"{unique_name}.{uniquename}",
+                "displayname": param_display,
+                "type": type_code,
+                "isoptional": optional,
+                "customapiid@odata.bind": f"/customapis({api_id})",
+            },
+        )
+    for uniquename, prop_display, type_code in responses:
+        client.post(
+            "customapiresponseproperties",
+            {
+                "uniquename": uniquename,
+                "name": f"{unique_name}.{uniquename}",
+                "displayname": prop_display,
+                "type": type_code,
+                "customapiid@odata.bind": f"/customapis({api_id})",
+            },
+        )
+    print(f"  + created Custom API {unique_name} ({len(params)} in / {len(responses)} out)")
 
 
 def seed_rows(client, seed_path):
@@ -550,12 +637,16 @@ def main():
     _, who = client.get("WhoAmI")
     print(f"  connected as UserId {who.get('UserId')}")
 
-    print("1/4 Global choice")
-    choice_id = ensure_global_choice(client)
+    print("1/4 Global choices")
+    choice_ids = {
+        "fwm_filestatus": ensure_global_choice(client, "fwm_filestatus", "FWM File Status", STATUS_OPTIONS),
+        "fwm_apistatus": ensure_global_choice(client, "fwm_apistatus", "FWM API Status", API_STATUS_OPTIONS),
+        "fwm_interfacetype": ensure_global_choice(client, "fwm_interfacetype", "FWM Interface Type", INTERFACE_TYPE_OPTIONS),
+    }
 
     print("2/4 Tables, columns, keys")
     for table in TABLES:
-        ensure_table(client, table, choice_id)
+        ensure_table(client, table, choice_ids)
 
     if args.tables_only:
         if args.seed:
@@ -568,8 +659,9 @@ def main():
     type_ids = ensure_plugin(client, args.dll)
     ensure_step(client, type_ids[PLUGIN_TYPE_OBSERVATION])
 
-    print("4/4 Custom API")
-    ensure_custom_api(client, type_ids[PLUGIN_TYPE_SWEEP])
+    print("4/4 Custom APIs")
+    for unique_name, definition in CUSTOM_APIS.items():
+        ensure_custom_api(client, unique_name, definition, type_ids)
 
     if args.seed:
         print("Seeding config rows")

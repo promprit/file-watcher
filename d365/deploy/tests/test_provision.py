@@ -27,18 +27,33 @@ def table_columns(table):
     """All logical column names provision.py creates for a TABLES entry."""
     cols = {table["primary"]["SchemaName"].lower()}
     cols.update(a["SchemaName"].lower() for a in table["attrs"])
-    cols.update(schema.lower() for schema, _, _ in table["picklists"])
+    cols.update(schema.lower() for schema, _, _, _ in table["picklists"])
     return cols
 
 
 class ChoiceValuesMatchSchemaCs(unittest.TestCase):
-    def test_status_choice_values_match(self):
+    def test_file_status_choice_values_match(self):
         text = schema_cs_text()
         cs_pairs = dict(re.findall(r"FileStatus\.(FILE_[A-Z_]+),\s*(\d{9})", text))
-        self.assertEqual(len(cs_pairs), 5, "Schema.cs should map 5 statuses")
+        self.assertEqual(len(cs_pairs), 5, "Schema.cs should map 5 file statuses")
         for name, value in provision.STATUS_OPTIONS:
             self.assertEqual(int(cs_pairs[name]), value,
                              f"choice value drift for {name}: Schema.cs={cs_pairs[name]} provision.py={value}")
+
+    def test_api_status_choice_values_match(self):
+        text = schema_cs_text()
+        cs_pairs = dict(re.findall(r"ApiStatus\.((?:MSG|FEED)_[A-Z_]+),\s*(\d{9})", text))
+        self.assertEqual(len(cs_pairs), 6, "Schema.cs should map 6 API statuses")
+        for name, value in provision.API_STATUS_OPTIONS:
+            self.assertEqual(int(cs_pairs[name]), value,
+                             f"choice value drift for {name}: Schema.cs={cs_pairs[name]} provision.py={value}")
+
+    def test_interface_type_choice_values_match(self):
+        text = schema_cs_text()
+        self.assertIn("InterfaceTypeFile = 100000000", text)
+        self.assertIn("InterfaceTypeApi = 100000001", text)
+        self.assertEqual(dict(provision.INTERFACE_TYPE_OPTIONS),
+                         {"File": 100000000, "Api": 100000001})
 
 
 class ColumnsMatchSchemaCs(unittest.TestCase):
@@ -47,6 +62,8 @@ class ColumnsMatchSchemaCs(unittest.TestCase):
         "FileEventTable": "fwm_fileevent",
         "FileObservationTable": "fwm_fileobservation",
         "InterfaceTable": "fwm_interface",
+        "ApiMessageTable": "fwm_apimessage",
+        "ApiEventTable": "fwm_apievent",
     }
 
     def test_every_schema_cs_column_is_provisioned(self):
@@ -83,6 +100,8 @@ class AlternateKeyBudget(unittest.TestCase):
         keys = {t["schema"]: [k[2] for k in t["keys"]] for t in provision.TABLES}
         self.assertIn(["fwm_interfaceid", "fwm_filepath"], keys["fwm_filestate"])
         self.assertIn(["fwm_eventid"], keys["fwm_fileevent"])
+        self.assertIn(["fwm_interfaceid", "fwm_messageid"], keys["fwm_apimessage"])
+        self.assertIn(["fwm_eventid"], keys["fwm_apievent"])
 
 
 class SeedFileShape(unittest.TestCase):

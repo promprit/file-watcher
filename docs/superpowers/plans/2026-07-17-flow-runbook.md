@@ -67,6 +67,22 @@ Behavior checklist to verify per deployed flow: see Task 5 of the code-migration
 3. **Notify:** Teams chat/channel post or email to the owner with interface id,
    event type, file path (null for SLA misses), occurred-at.
 
+## D. API monitoring additions
+
+**Reporting (no flow needed if the integration calls directly):** integrations invoke
+unbound action `fwm_ReportApiMessage` (`InterfaceId`, `MessageId`,
+`Action` = `Received|Processed|Failed`, optional `CorrelationId`/`ErrorCode`).
+For F&O-side processing, create per feed: **trigger** "When an action is performed"
+(F&O business event) → **Perform unbound action** `fwm_ReportApiMessage`.
+
+**API SLA sweep:** extend the sweep flow (or clone it): List rows `fwm_interface`
+where `fwm_enabled eq true and fwm_interfacetype eq 100000001` → Apply to each →
+unbound action `fwm_CheckApiSla` with `InterfaceId`. Same 15-min recurrence.
+
+**API alert flow:** trigger on `fwm_apievent` create, filter
+`fwm_eventtype eq 100000003 or fwm_eventtype eq 100000004 or fwm_eventtype eq 100000005`
+(MSG_FAILED / MSG_TIMEOUT / FEED_MISSING_BY_SLA) → notify the interface's alert owner.
+
 ## Prerequisites recap
 
 - Plugin assembly registered (sync PostOperation on `fwm_fileobservation` Create) and

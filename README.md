@@ -5,9 +5,12 @@ Dataverse tables (the database), a C# plugin (the logic), Power Automate flows (
 watchers), and a model-driven Power App (config + monitoring UI). **Zero servers** — nothing
 hosted outside the client's D365 environment and Power Platform.
 
-It watches file sources (SFTP / Azure Blob / SharePoint / on-prem folders), tracks each
-file's lifecycle (`FILE_DETECTED`, `FILE_STABLE`, `FILE_DUPLICATE`, `FILE_STUCK`,
-`FILE_MISSING_BY_SLA`), and alerts owners when feeds are stuck or missed their SLA.
+It monitors both interface entry-point types on one engine: **file sources**
+(SFTP / Azure Blob / SharePoint / on-prem folders) are watched — lifecycle
+`FILE_DETECTED → FILE_STABLE`, plus duplicate/stuck/missing-by-SLA detection — and
+**API entry points** self-report via Custom API `fwm_ReportApiMessage`
+(`MSG_RECEIVED/PROCESSED/FAILED/TIMEOUT` + feed heartbeat). Owners get alerted the
+minute a feed is stuck, failed, or silent.
 
 **Start here:**
 - [How it works](docs/how-it-works.md) — plain-language runtime walkthrough

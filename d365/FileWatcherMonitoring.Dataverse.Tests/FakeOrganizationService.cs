@@ -52,8 +52,8 @@ namespace FileWatcherMonitoring.Dataverse.Tests
                     throw new NotSupportedException("Fake supports Equal conditions only");
                 }
                 var attribute = condition.AttributeName;
-                var value = condition.Values[0];
-                rows = rows.Where(r => Equals(r.GetAttributeValue<object>(attribute), value));
+                var value = Normalize(condition.Values[0]);
+                rows = rows.Where(r => Equals(Normalize(r.GetAttributeValue<object>(attribute)), value));
             }
 
             if (qe.TopCount.HasValue)
@@ -63,6 +63,13 @@ namespace FileWatcherMonitoring.Dataverse.Tests
             var result = new EntityCollection();
             result.Entities.AddRange(rows);
             return result;
+        }
+
+        /// <summary>Query conditions arrive as raw ints for choice columns; stored values
+        /// are OptionSetValue — compare on the underlying value, like Dataverse does.</summary>
+        private static object Normalize(object value)
+        {
+            return value is OptionSetValue osv ? (object)osv.Value : value;
         }
 
         public OrganizationResponse Execute(OrganizationRequest request)

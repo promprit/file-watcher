@@ -75,6 +75,8 @@ namespace FileWatcherMonitoring.Plugins
         public int StuckThresholdSeconds { get; set; }
         /// <summary>"HH:mm" 24-hour UTC daily arrival deadline (not local time).</summary>
         public string SlaDeadline { get; set; }
+        /// <summary>API interfaces: seconds a received message may stay unprocessed before MSG_TIMEOUT.</summary>
+        public int ProcessingTimeoutSeconds { get; set; }
     }
 
     /// <summary>Same contract as the TS StateRepository interface.</summary>

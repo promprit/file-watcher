@@ -140,6 +140,20 @@ re-fires on the next missed day.
   full per-batch event history; ops staff configure new interfaces in the same app — a form,
   not a deployment.
 
+## API entry points — the second rule pack
+
+Interfaces that enter through APIs (OData/custom services, async messages) don't need
+watching — they already touch D365 when they run, so they **self-report** into the same
+monitor: the integration (or an F&O business-event flow) calls Custom API
+`fwm_ReportApiMessage` with `Received` / `Processed` / `Failed`. Same engine skeleton,
+same transaction guarantee, own statuses (`MSG_RECEIVED`, `MSG_PROCESSED`,
+`MSG_DUPLICATE`, `MSG_FAILED`, `MSG_TIMEOUT`) in `fwm_apimessage` +
+append-only `fwm_apievent`. A sweep (`fwm_CheckApiSla`) adds what self-reporting can't:
+timeouts (received but never processed) and the feed heartbeat (`FEED_MISSING_BY_SLA` —
+nothing arrived today, sentinel-idempotent like the file SLA). Files are *watched*
+because they can't speak; APIs *report* because they can. One monitor, two rule packs.
+Details: [API entry-point monitoring spec](superpowers/specs/2026-07-22-api-entrypoint-monitoring-design.md).
+
 ## Why there is no Gateway / outbox / retry queue
 
 The original external-services design needed an outbox because the event writer sat outside

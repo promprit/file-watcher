@@ -85,7 +85,8 @@ namespace FileWatcherMonitoring.Dataverse
                 DuplicateCheckEnabled = row.GetAttributeValue<bool>(Schema.InterfaceTable.DuplicateCheckEnabled),
                 StuckThresholdSeconds = row.GetAttributeValue<int>(Schema.InterfaceTable.StuckThresholdSeconds),
                 SlaDeadline = row.GetAttributeValue<string>(Schema.InterfaceTable.SlaDeadline),
-                EnabledFlag = row.GetAttributeValue<bool>(Schema.InterfaceTable.Enabled)
+                EnabledFlag = row.GetAttributeValue<bool>(Schema.InterfaceTable.Enabled),
+                ProcessingTimeoutSeconds = row.GetAttributeValue<int>(Schema.InterfaceTable.ProcessingTimeoutSeconds)
             };
         }
     }
