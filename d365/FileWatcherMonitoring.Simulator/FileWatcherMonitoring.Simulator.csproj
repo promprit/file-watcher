@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <RootNamespace>FileWatcherMonitoring.Simulator</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.1.32" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../FileWatcherMonitoring.Plugins/FileWatcherMonitoring.Plugins.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same production sources the plugin ships; same fake service the tests use. -->
+    <Compile Include="../FileWatcherMonitoring.Dataverse/Schema.cs" Link="Dataverse/Schema.cs" />
+    <Compile Include="../FileWatcherMonitoring.Dataverse/DataverseStateRepository.cs" Link="Dataverse/DataverseStateRepository.cs" />
+    <Compile Include="../FileWatcherMonitoring.Dataverse/Processors.cs" Link="Dataverse/Processors.cs" />
+    <Compile Include="../FileWatcherMonitoring.Dataverse.Tests/FakeOrganizationService.cs" Link="Dataverse/FakeOrganizationService.cs" />
+  </ItemGroup>
+
+</Project>

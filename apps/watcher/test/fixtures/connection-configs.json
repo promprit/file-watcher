@@ -1,0 +1,15 @@
+[
+  {
+    "connectionRef": "sftp-agdoc-prod",
+    "storageType": "SFTP",
+    "environment": "production",
+    "endpoint": "sftp.agdoc.com",
+    "port": 22,
+    "username": "integration_user",
+    "authenticationType": "PRIVATE_KEY",
+    "credentialRef": "sftp-agdoc-key",
+    "timeoutSeconds": 30,
+    "enabledFlag": true,
+    "owner": "integration-team@example.com"
+  }
+]

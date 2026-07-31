@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>FileWatcherMonitoring.Dataverse</RootNamespace>
+    <!-- Strong-named for maximum registration compatibility. NOTE: the checked-in
+         .snk is a DEV key generated in-sandbox; for production the client should
+         swap in an org-controlled key before the final build. -->
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>FileWatcherMonitoring.snk</AssemblyOriginatorKeyFile>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.56" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Engine core sources compiled directly in (not a ProjectReference): classic
+         Dataverse plugin registration takes ONE self-contained assembly. The engine
+         namespace stays FileWatcherMonitoring.Plugins; behavior is identical to the
+         DLL the parity suite verifies. -->
+    <Compile Include="../FileWatcherMonitoring.Plugins/**/*.cs"
+             Exclude="../FileWatcherMonitoring.Plugins/bin/**;../FileWatcherMonitoring.Plugins/obj/**"
+             LinkBase="EngineCore" />
+  </ItemGroup>
+
+</Project>

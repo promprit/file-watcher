@@ -1,0 +1,14 @@
+[
+  {
+    "interfaceId": "SA-034",
+    "batchId": "SA-034-20260715-100000-ABCD",
+    "filePath": "/ag-doc/vendor-invoice/inbound/VendorInvoice_20260715.xlsx",
+    "fileName": "VendorInvoice_20260715.xlsx",
+    "fileSizeBytes": 258300,
+    "previousStatus": null,
+    "currentStatus": "FILE_DETECTED",
+    "statusChangedAt": "2026-07-15T10:00:00Z",
+    "firstDetectedAt": "2026-07-15T10:00:00Z",
+    "lastSeenAt": "2026-07-15T10:00:00Z"
+  }
+]

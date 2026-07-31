@@ -1,0 +1,37 @@
+{
+  "$comment": "Sample config rows for provision.py --seed. Column names are the Dataverse logical names (see Schema.cs). Copy, adjust, never put credentials here — connector credentials live in Power Automate connection references.",
+  "connections": [
+    {
+      "fwm_connectionref": "sftp-agdoc-prod",
+      "fwm_storagetype": "SFTP",
+      "fwm_endpoint": "sftp.agdoc.example.com",
+      "fwm_enabled": true
+    }
+  ],
+  "interfaces": [
+    {
+      "fwm_interfaceid": "SA-034",
+      "fwm_name": "AgDoc Vendor Invoices",
+      "fwm_inboundpath": "/ag-doc/vendor-invoice/inbound/",
+      "fwm_filepattern": "VendorInvoice_.*\\.xlsx$",
+      "fwm_pollintervalseconds": 60,
+      "fwm_stabilitycheckseconds": 30,
+      "fwm_duplicatecheckenabled": true,
+      "fwm_stuckthresholdseconds": 3600,
+      "fwm_sladeadline": "08:00",
+      "fwm_enabled": true
+    },
+    {
+      "fwm_interfaceid": "TEST-001",
+      "fwm_name": "Smoke test interface (short stability window)",
+      "fwm_inboundpath": "/smoke/",
+      "fwm_filepattern": ".*\\.csv$",
+      "fwm_pollintervalseconds": 60,
+      "fwm_stabilitycheckseconds": 5,
+      "fwm_duplicatecheckenabled": true,
+      "fwm_stuckthresholdseconds": 600,
+      "fwm_sladeadline": "23:59",
+      "fwm_enabled": true
+    }
+  ]
+}

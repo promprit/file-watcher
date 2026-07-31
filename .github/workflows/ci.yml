@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  reference-engine:
+    name: TS reference engine (vitest + vector drift check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Regenerate parity vectors and fail on drift
+        run: |
+          npm run parity:vectors -w @apps/watcher
+          git diff --exit-code docs/superpowers/specs/parity/engine-test-vectors.json \
+            || (echo "::error::engine-test-vectors.json is stale — regenerate with 'npm run parity:vectors -w @apps/watcher' and commit" && exit 1)
+
+  csharp-port:
+    name: C# port (vector parity tests + plugin assembly build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run vector-driven parity suite
+        run: dotnet test d365/FileWatcherMonitoring.Plugins.Tests --nologo
+      - name: Run Dataverse-layer suite (fake IOrganizationService)
+        run: dotnet test d365/FileWatcherMonitoring.Dataverse.Tests --nologo
+      - name: Build Dataverse plugin assembly
+        run: dotnet build d365/FileWatcherMonitoring.Dataverse --nologo
+      - name: Build local E2E simulator
+        run: dotnet build d365/FileWatcherMonitoring.Simulator --nologo
+
+  deploy-tooling:
+    name: Deploy tooling (schema drift guard + dry-run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unittest suite (Schema.cs cross-check, key budget, dry-run)
+        run: python3 -m unittest discover -s d365/deploy/tests -v

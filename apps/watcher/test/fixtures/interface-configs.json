@@ -1,0 +1,20 @@
+[
+  {
+    "interfaceId": "SA-034",
+    "interfaceName": "Vendor Invoice Posting",
+    "sourceSystem": "AG-DOC",
+    "targetSystem": "D365",
+    "connectionRef": "sftp-agdoc-prod",
+    "inboundPath": "/ag-doc/vendor-invoice/inbound/",
+    "filePattern": "VendorInvoice_*.xlsx",
+    "pollIntervalSeconds": 60,
+    "readinessRule": "STABLE_SIZE",
+    "stabilityCheckSeconds": 30,
+    "duplicateCheckEnabled": true,
+    "stuckThresholdMinutes": 60,
+    "expectedSchedule": null,
+    "slaThresholdMinutes": null,
+    "alertOwner": "integration-team@example.com",
+    "enabledFlag": true
+  }
+]
